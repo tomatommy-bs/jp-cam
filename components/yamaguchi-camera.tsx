@@ -84,6 +84,20 @@ const CITIES = [
   }
 ];
 
+// 各市の概算バウンディングボックス（緯度経度）。矩形近似のため海岸線などで多少のズレあり。
+const CITY_BOUNDS: Record<string, { north: number; south: number; east: number; west: number }> = {
+  shimonoseki: { north: 34.30, south: 33.95, east: 131.10, west: 130.85 },
+  ube:         { north: 34.10, south: 33.92, east: 131.45, west: 131.20 },
+  yamaguchi:   { north: 34.40, south: 34.00, east: 131.65, west: 131.30 },
+  hagi:        { north: 34.65, south: 34.20, east: 131.80, west: 131.25 },
+  hofu:        { north: 34.15, south: 34.00, east: 131.65, west: 131.50 },
+  kudamatsu:   { north: 34.15, south: 33.95, east: 132.00, west: 131.85 },
+  iwakuni:     { north: 34.45, south: 33.95, east: 132.20, west: 131.80 },
+  hikari:      { north: 34.10, south: 33.90, east: 132.00, west: 131.85 },
+  nagato:      { north: 34.55, south: 34.30, east: 131.30, west: 131.05 },
+  yanai:       { north: 34.00, south: 33.85, east: 132.20, west: 132.05 },
+};
+
 const COLORS = ['#ffffff', '#fbbf24', '#fb7185', '#60a5fa', '#34d399', '#a78bfa', '#000000'];
 
 const STROKE_OPTIONS = [
@@ -106,8 +120,43 @@ export default function YamaguchiCamera() {
   const [facingMode, setFacingMode] = useState('environment');
   const [showSettings, setShowSettings] = useState(false);
   const [showFill, setShowFill] = useState(false);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [showLocation, setShowLocation] = useState(true);
+  const [showLocationPin, setShowLocationPin] = useState(true);
 
   const currentCity = CITIES[cityIndex];
+
+  useEffect(() => {
+    if (!('geolocation' in navigator)) {
+      setGeoError('位置情報に対応していません');
+      return;
+    }
+    const id = navigator.geolocation.watchPosition(
+      pos => {
+        setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoError(null);
+      },
+      err => setGeoError(err.message || '位置情報を取得できません'),
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
+
+  // 現在地がcurrentCityのbbox内なら、SVG (0-200) 座標に変換して返す
+  // 現在地のSVG座標（bbox外/未取得ならnull）。OFFでも撮影後のロゴには出すため常に計算。
+  const dotPosRaw = (() => {
+    if (!userCoords) return null;
+    const b = CITY_BOUNDS[currentCity.id];
+    if (!b) return null;
+    const { lat, lng } = userCoords;
+    if (lat < b.south || lat > b.north || lng < b.west || lng > b.east) return null;
+    const x = ((lng - b.west) / (b.east - b.west)) * 200;
+    const y = ((b.north - lat) / (b.north - b.south)) * 200;
+    return { x, y };
+  })();
+  // ライブプレビュー側はトグルで制御
+  const dotPos = showLocation ? dotPosRaw : null;
 
   useEffect(() => {
     let activeStream = null;
@@ -190,6 +239,7 @@ export default function YamaguchiCamera() {
       <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="0.6" mask="url(#silhouette-mask)" />
       <g transform="translate(100,100) scale(${scale}) translate(-100,-100)">
         <path d="${currentCity.path}" ${fillAttr} stroke="${color}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>
+        ${dotPos ? `<circle cx="${dotPos.x}" cy="${dotPos.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
       </g>
     </svg>`;
 
@@ -224,6 +274,16 @@ export default function YamaguchiCamera() {
       ctx.fillStyle = color;
       ctx.globalAlpha = Math.min(opacity + 0.1, 1) * 0.9;
       ctx.fill(path);
+      if (dotPosRaw && showLocationPin) {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 4;
+        ctx.font = '32px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText('📍', dotPosRaw.x, dotPosRaw.y + 4);
+        ctx.shadowBlur = 0;
+      }
       ctx.restore();
 
       ctx.shadowBlur = 0;
@@ -333,6 +393,17 @@ export default function YamaguchiCamera() {
                   opacity={opacity}
                   style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }}
                 />
+                {dotPos && (
+                  <circle
+                    cx={dotPos.x}
+                    cy={dotPos.y}
+                    r={3.5}
+                    fill="#ef4444"
+                    stroke="white"
+                    strokeWidth={1}
+                    style={{ filter: 'drop-shadow(0 0 3px rgba(239,68,68,0.8))' }}
+                  />
+                )}
               </g>
             </svg>
             
@@ -342,8 +413,32 @@ export default function YamaguchiCamera() {
                 <div className="text-base font-bold leading-tight">{currentCity.name}</div>
                 <div className="text-[9px] text-gray-300 tracking-[0.15em] leading-tight">{currentCity.reading}</div>
               </div>
-              <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-[10px] tabular-nums">
-                {String(cityIndex + 1).padStart(2, '0')} / {CITIES.length}
+              <div className="flex flex-col items-end gap-1">
+                <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-[10px] tabular-nums">
+                  {String(cityIndex + 1).padStart(2, '0')} / {CITIES.length}
+                </div>
+                {geoError ? null : (
+                  <button
+                    onClick={() => setShowLocation(s => !s)}
+                    className={`pointer-events-auto backdrop-blur-sm px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition-colors ${
+                      dotPos
+                        ? 'bg-red-500/80 text-white'
+                        : showLocation
+                          ? 'bg-black/50 text-gray-300'
+                          : 'bg-black/50 text-gray-500'
+                    }`}
+                    aria-pressed={showLocation}
+                  >
+                    {showLocation && dotPos && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                    {!showLocation
+                      ? '現在地: OFF'
+                      : dotPos
+                        ? '現在地'
+                        : userCoords
+                          ? '市外'
+                          : '位置取得中…'}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -412,14 +507,28 @@ export default function YamaguchiCamera() {
                 <label className="flex items-center justify-between text-xs cursor-pointer pt-1">
                   <span className="text-gray-300">塗りつぶし</span>
                   <div className="relative">
-                    <input 
-                      type="checkbox" 
-                      checked={showFill} 
+                    <input
+                      type="checkbox"
+                      checked={showFill}
                       onChange={e => setShowFill(e.target.checked)}
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-gray-700 rounded-full peer-checked:bg-white transition-colors"></div>
                     <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform ${showFill ? 'translate-x-4 bg-black' : 'bg-gray-300'}`}></div>
+                  </div>
+                </label>
+
+                <label className="flex items-center justify-between text-xs cursor-pointer">
+                  <span className="text-gray-300">ロゴに現在地ピンを表示</span>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={showLocationPin}
+                      onChange={e => setShowLocationPin(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-700 rounded-full peer-checked:bg-white transition-colors"></div>
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform ${showLocationPin ? 'translate-x-4 bg-black' : 'bg-gray-300'}`}></div>
                   </div>
                 </label>
               </div>
