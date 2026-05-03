@@ -213,6 +213,19 @@ export default function YamaguchiCamera() {
       ctx.font = `${subSize}px -apple-system, sans-serif`;
       ctx.globalAlpha = Math.min(opacity + 0.1, 1) * 0.75;
       ctx.fillText(currentCity.reading, w - 28, h - 28 - fontSize - 4);
+
+      const iconSize = fontSize * 2;
+      const iconRight = w - 28;
+      const iconBottom = h - 28 - fontSize - 4 - subSize - 6;
+      ctx.save();
+      ctx.translate(iconRight - iconSize, iconBottom - iconSize);
+      ctx.scale(iconSize / 200, iconSize / 200);
+      const path = new Path2D(currentCity.path);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = Math.min(opacity + 0.1, 1) * 0.9;
+      ctx.fill(path);
+      ctx.restore();
+
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
     };
