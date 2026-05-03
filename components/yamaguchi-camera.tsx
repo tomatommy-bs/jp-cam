@@ -123,6 +123,7 @@ export default function YamaguchiCamera() {
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [showLocation, setShowLocation] = useState(true);
+  const [showLocationPin, setShowLocationPin] = useState(true);
 
   const currentCity = CITIES[cityIndex];
 
@@ -273,7 +274,7 @@ export default function YamaguchiCamera() {
       ctx.fillStyle = color;
       ctx.globalAlpha = Math.min(opacity + 0.1, 1) * 0.9;
       ctx.fill(path);
-      if (dotPosRaw) {
+      if (dotPosRaw && showLocationPin) {
         ctx.globalAlpha = 1;
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.shadowBlur = 4;
@@ -506,14 +507,28 @@ export default function YamaguchiCamera() {
                 <label className="flex items-center justify-between text-xs cursor-pointer pt-1">
                   <span className="text-gray-300">塗りつぶし</span>
                   <div className="relative">
-                    <input 
-                      type="checkbox" 
-                      checked={showFill} 
+                    <input
+                      type="checkbox"
+                      checked={showFill}
                       onChange={e => setShowFill(e.target.checked)}
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-gray-700 rounded-full peer-checked:bg-white transition-colors"></div>
                     <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform ${showFill ? 'translate-x-4 bg-black' : 'bg-gray-300'}`}></div>
+                  </div>
+                </label>
+
+                <label className="flex items-center justify-between text-xs cursor-pointer">
+                  <span className="text-gray-300">ロゴに現在地ピンを表示</span>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={showLocationPin}
+                      onChange={e => setShowLocationPin(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-700 rounded-full peer-checked:bg-white transition-colors"></div>
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform ${showLocationPin ? 'translate-x-4 bg-black' : 'bg-gray-300'}`}></div>
                   </div>
                 </label>
               </div>
