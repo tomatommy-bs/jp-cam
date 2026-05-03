@@ -143,8 +143,8 @@ export default function YamaguchiCamera() {
   }, []);
 
   // 現在地がcurrentCityのbbox内なら、SVG (0-200) 座標に変換して返す
-  const dotPos = (() => {
-    if (!showLocation) return null;
+  // 現在地のSVG座標（bbox外/未取得ならnull）。OFFでも撮影後のロゴには出すため常に計算。
+  const dotPosRaw = (() => {
     if (!userCoords) return null;
     const b = CITY_BOUNDS[currentCity.id];
     if (!b) return null;
@@ -154,6 +154,8 @@ export default function YamaguchiCamera() {
     const y = ((b.north - lat) / (b.north - b.south)) * 200;
     return { x, y };
   })();
+  // ライブプレビュー側はトグルで制御
+  const dotPos = showLocation ? dotPosRaw : null;
 
   useEffect(() => {
     let activeStream = null;
@@ -271,14 +273,14 @@ export default function YamaguchiCamera() {
       ctx.fillStyle = color;
       ctx.globalAlpha = Math.min(opacity + 0.1, 1) * 0.9;
       ctx.fill(path);
-      if (dotPos) {
+      if (dotPosRaw) {
         ctx.globalAlpha = 1;
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.shadowBlur = 4;
         ctx.font = '32px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'alphabetic';
-        ctx.fillText('📍', dotPos.x, dotPos.y + 4);
+        ctx.fillText('📍', dotPosRaw.x, dotPosRaw.y + 4);
         ctx.shadowBlur = 0;
       }
       ctx.restore();
