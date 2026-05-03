@@ -273,13 +273,13 @@ export default function YamaguchiCamera() {
       ctx.fill(path);
       if (dotPos) {
         ctx.globalAlpha = 1;
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath();
-        ctx.arc(dotPos.x, dotPos.y, 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#ffffff';
-        ctx.stroke();
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 4;
+        ctx.font = '32px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText('📍', dotPos.x, dotPos.y + 4);
+        ctx.shadowBlur = 0;
       }
       ctx.restore();
 
