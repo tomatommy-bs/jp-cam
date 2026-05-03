@@ -86,6 +86,12 @@ const CITIES = [
 
 const COLORS = ['#ffffff', '#fbbf24', '#fb7185', '#60a5fa', '#34d399', '#a78bfa', '#000000'];
 
+const STROKE_OPTIONS = [
+  { id: 'thick', label: '太い', value: 2.2 },
+  { id: 'thin',  label: '細い', value: 0.8 },
+  { id: 'none',  label: 'なし', value: 0 },
+] as const;
+
 export default function YamaguchiCamera() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -372,12 +378,22 @@ export default function YamaguchiCamera() {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-gray-400 flex justify-between mb-1 tracking-wide">
-                    <span>STROKE</span><span className="tabular-nums">{strokeWidth.toFixed(1)}</span>
-                  </label>
-                  <input type="range" min="0.5" max="6" step="0.1" value={strokeWidth}
-                    onChange={e => setStrokeWidth(parseFloat(e.target.value))}
-                    className="w-full accent-white"/>
+                  <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide">STROKE</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {STROKE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setStrokeWidth(opt.value)}
+                        className={`py-1.5 rounded text-[11px] transition-colors ${
+                          strokeWidth === opt.value
+                            ? 'bg-white text-black font-semibold'
+                            : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <label className="flex items-center justify-between text-xs cursor-pointer pt-1">
