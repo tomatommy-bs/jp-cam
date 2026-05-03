@@ -122,6 +122,7 @@ export default function YamaguchiCamera() {
   const [showFill, setShowFill] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [showLocation, setShowLocation] = useState(true);
 
   const currentCity = CITIES[cityIndex];
 
@@ -143,6 +144,7 @@ export default function YamaguchiCamera() {
 
   // 現在地がcurrentCityのbbox内なら、SVG (0-200) 座標に変換して返す
   const dotPos = (() => {
+    if (!showLocation) return null;
     if (!userCoords) return null;
     const b = CITY_BOUNDS[currentCity.id];
     if (!b) return null;
@@ -412,19 +414,27 @@ export default function YamaguchiCamera() {
                 <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-[10px] tabular-nums">
                   {String(cityIndex + 1).padStart(2, '0')} / {CITIES.length}
                 </div>
-                {dotPos ? (
-                  <div className="bg-red-500/80 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                    現在地
-                  </div>
-                ) : userCoords ? (
-                  <div className="bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] text-gray-300">
-                    市外
-                  </div>
-                ) : geoError ? null : (
-                  <div className="bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] text-gray-400">
-                    位置取得中…
-                  </div>
+                {geoError ? null : (
+                  <button
+                    onClick={() => setShowLocation(s => !s)}
+                    className={`pointer-events-auto backdrop-blur-sm px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition-colors ${
+                      dotPos
+                        ? 'bg-red-500/80 text-white'
+                        : showLocation
+                          ? 'bg-black/50 text-gray-300'
+                          : 'bg-black/50 text-gray-500'
+                    }`}
+                    aria-pressed={showLocation}
+                  >
+                    {showLocation && dotPos && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                    {!showLocation
+                      ? '現在地: OFF'
+                      : dotPos
+                        ? '現在地'
+                        : userCoords
+                          ? '市外'
+                          : '位置取得中…'}
+                  </button>
                 )}
               </div>
             </div>
