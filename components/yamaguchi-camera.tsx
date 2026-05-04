@@ -327,28 +327,37 @@ export default function YamaguchiCamera() {
       ctx.globalAlpha = 1;
     };
     
+    const finalize = () => {
+      const dataUrl = canvas.toDataURL('image/png');
+      setCapturedImage(dataUrl);
+      downloadDataUrl(dataUrl);
+      URL.revokeObjectURL(url);
+    };
+
     img.onload = () => {
       ctx.drawImage(img, 0, 0, w, h);
       drawWatermark();
-      setCapturedImage(canvas.toDataURL('image/png'));
-      URL.revokeObjectURL(url);
+      finalize();
     };
     img.onerror = () => {
       drawWatermark();
-      setCapturedImage(canvas.toDataURL('image/png'));
-      URL.revokeObjectURL(url);
+      finalize();
     };
     img.src = url;
   };
 
-  const handleDownload = () => {
-    if (!capturedImage) return;
+  const downloadDataUrl = (dataUrl: string) => {
     const link = document.createElement('a');
-    link.href = capturedImage;
+    link.href = dataUrl;
     link.download = `yamaguchi_${currentCity.id}_${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleDownload = () => {
+    if (!capturedImage) return;
+    downloadDataUrl(capturedImage);
   };
 
   return (
