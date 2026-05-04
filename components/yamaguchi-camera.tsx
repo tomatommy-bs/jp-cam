@@ -253,7 +253,6 @@ export default function YamaguchiCamera() {
   const isDigitalZoom = !zoomCaps;
   const zoomMin = zoomCaps ? zoomCaps.min : 1;
   const zoomMax = zoomCaps ? zoomCaps.max : 5;
-  const zoomStep = zoomCaps ? zoomCaps.step : 0.1;
 
   const handleCapture = () => {
     const video = videoRef.current;
@@ -540,30 +539,6 @@ export default function YamaguchiCamera() {
               </div>
             </div>
 
-            {/* Zoom quick controls */}
-            {!loading && (
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-3 flex items-center gap-1.5 bg-black/55 backdrop-blur-sm rounded-full px-2 py-1">
-                {(() => {
-                  const presets = [zoomMin, ...[2, 3, 5].filter(v => v <= zoomMax && v > zoomMin)];
-                  return presets.map(v => {
-                    const active = Math.abs(zoom - v) < 0.05;
-                    return (
-                      <button
-                        key={v}
-                        onClick={() => setZoom(v)}
-                        className={`min-w-[34px] px-2 py-1 rounded-full text-[11px] tabular-nums transition-colors ${
-                          active ? 'bg-white text-black font-semibold' : 'text-gray-200 hover:bg-white/10'
-                        }`}
-                        aria-label={`ズーム ${v}倍`}
-                      >
-                        {v}x
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-            )}
-
             {/* Settings panel overlay */}
             {showSettings && (
               <div className="absolute inset-x-0 bottom-0 bg-black/90 backdrop-blur-md p-4 space-y-3 z-30 border-t border-white/10">
@@ -595,16 +570,6 @@ export default function YamaguchiCamera() {
                   </label>
                   <input type="range" min="0.1" max="1" step="0.05" value={opacity} 
                     onChange={e => setOpacity(parseFloat(e.target.value))} 
-                    className="w-full accent-white"/>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-gray-400 flex justify-between mb-1 tracking-wide">
-                    <span>ZOOM{isDigitalZoom ? ' (デジタル)' : ''}</span>
-                    <span className="tabular-nums">{zoom.toFixed(2)}x</span>
-                  </label>
-                  <input type="range" min={zoomMin} max={zoomMax} step={zoomStep} value={zoom}
-                    onChange={e => setZoom(parseFloat(e.target.value))}
                     className="w-full accent-white"/>
                 </div>
 
