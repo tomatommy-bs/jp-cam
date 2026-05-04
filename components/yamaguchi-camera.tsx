@@ -238,17 +238,40 @@ export default function YamaguchiCamera() {
     const canvas = canvasRef.current;
     if (!video || !canvas || !video.videoWidth) return;
 
-    const w = video.videoWidth;
-    const h = video.videoHeight;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    // Match the preview's object-cover crop so the captured image and
+    // SVG silhouette align with what the user sees on screen. Without
+    // this, a portrait container + landscape camera (or vice-versa)
+    // makes the silhouette appear at a different size in the photo.
+    const rect = video.getBoundingClientRect();
+    const containerW = rect.width || vw;
+    const containerH = rect.height || vh;
+    const containerAspect = containerW / containerH;
+    const videoAspect = vw / vh;
+
+    let baseCropW: number;
+    let baseCropH: number;
+    if (videoAspect > containerAspect) {
+      baseCropH = vh;
+      baseCropW = vh * containerAspect;
+    } else {
+      baseCropW = vw;
+      baseCropH = vw / containerAspect;
+    }
+
+    const w = Math.round(baseCropW);
+    const h = Math.round(baseCropH);
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
 
     const useCrop = isDigitalZoom && zoom > 1;
-    const sw = useCrop ? w / zoom : w;
-    const sh = useCrop ? h / zoom : h;
-    const sx = useCrop ? (w - sw) / 2 : 0;
-    const sy = useCrop ? (h - sh) / 2 : 0;
+    const sw = useCrop ? baseCropW / zoom : baseCropW;
+    const sh = useCrop ? baseCropH / zoom : baseCropH;
+    const sx = (vw - sw) / 2;
+    const sy = (vh - sh) / 2;
 
     if (facingMode === 'user') {
       ctx.save();
