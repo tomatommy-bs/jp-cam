@@ -27,6 +27,26 @@ export const metadata: Metadata = {
     ],
     apple: '/apple-icon.png',
   },
+  openGraph: {
+    title: 'YAMAGUCHI 13 - 山口県13市シルエットカメラ',
+    description: '山口県内13市の地形シルエットをカメラ映像にオーバーレイ表示。市の形を意識した撮影体験を提供する地域PR・観光・教育向けWebアプリ。',
+    type: 'website',
+    locale: 'ja_JP',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'YAMAGUCHI 13 - 山口県13市シルエットカメラ',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'YAMAGUCHI 13 - 山口県13市シルエットカメラ',
+    description: '山口県内13市の地形シルエットをカメラ映像にオーバーレイ表示。市の形を意識した撮影体験を提供する地域PR・観光・教育向けWebアプリ。',
+    images: ['/og-image.png'],
+  },
 }
 
 export default function RootLayout({
