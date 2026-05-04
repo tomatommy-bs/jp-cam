@@ -120,6 +120,7 @@ export default function YamaguchiCamera() {
   const [facingMode, setFacingMode] = useState('environment');
   const [showSettings, setShowSettings] = useState(false);
   const [showFill, setShowFill] = useState(false);
+  const [maskMode, setMaskMode] = useState<'translucent' | 'solid'>('translucent');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [showLocation, setShowLocation] = useState(true);
@@ -236,7 +237,7 @@ export default function YamaguchiCamera() {
           </g>
         </mask>
       </defs>
-      <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="0.6" mask="url(#silhouette-mask)" />
+      <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="${maskMode === 'solid' ? 1 : 0.6}" mask="url(#silhouette-mask)" />
       <g transform="translate(100,100) scale(${scale}) translate(-100,-100)">
         <path d="${currentCity.path}" ${fillAttr} stroke="${color}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>
         ${dotPos ? `<circle cx="${dotPos.x}" cy="${dotPos.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
@@ -375,10 +376,10 @@ export default function YamaguchiCamera() {
                   </g>
                 </mask>
               </defs>
-              <rect 
-                x="-500" y="-500" width="1200" height="1200" 
-                fill="black" 
-                fillOpacity={0.6}
+              <rect
+                x="-500" y="-500" width="1200" height="1200"
+                fill="black"
+                fillOpacity={maskMode === 'solid' ? 1 : 0.6}
                 mask="url(#silhouette-mask)"
               />
               <g transform={`translate(100,100) scale(${scale}) translate(-100,-100)`}>
@@ -501,6 +502,32 @@ export default function YamaguchiCamera() {
                         {opt.label}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide">MASK</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      onClick={() => setMaskMode('translucent')}
+                      className={`py-1.5 rounded text-[11px] transition-colors ${
+                        maskMode === 'translucent'
+                          ? 'bg-white text-black font-semibold'
+                          : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                      }`}
+                    >
+                      半透明
+                    </button>
+                    <button
+                      onClick={() => setMaskMode('solid')}
+                      className={`py-1.5 rounded text-[11px] transition-colors ${
+                        maskMode === 'solid'
+                          ? 'bg-white text-black font-semibold'
+                          : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                      }`}
+                    >
+                      塗りつぶし黒
+                    </button>
                   </div>
                 </div>
 
