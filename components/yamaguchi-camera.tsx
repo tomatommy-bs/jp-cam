@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Download, RotateCcw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn } from 'lucide-react';
+import { ZoomRuler } from '@/components/zoom-ruler';
 
 const CITIES = [
   {
@@ -109,7 +110,6 @@ const STROKE_OPTIONS = [
 const SCALE_MIN = 0.3;
 const SCALE_MAX = 2;
 const SCALE_STEP = 0.1;
-const ZOOM_STEP = 0.5;
 
 function StrokeIcon({ value, className = 'w-5 h-5' }: { value: number; className?: string }) {
   if (value === 0) {
@@ -539,6 +539,22 @@ export default function YamaguchiCamera() {
               </div>
             </div>
 
+            {/* Zoom ruler overlay */}
+            {!loading && activeMenu === 'zoom' && (
+              <div className="absolute inset-x-0 bottom-3 z-30 px-6">
+                <div className="bg-black/55 backdrop-blur-sm rounded-xl border border-white/10 px-2 pb-1.5">
+                  <ZoomRuler
+                    min={zoomMin}
+                    max={zoomMax}
+                    step={0.1}
+                    majorEvery={5}
+                    value={zoom}
+                    onChange={(v) => setZoom(v)}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Settings panel overlay */}
             {showSettings && (
               <div className="absolute inset-x-0 bottom-0 bg-black/90 backdrop-blur-md p-4 space-y-3 z-30 border-t border-white/10">
@@ -670,48 +686,21 @@ export default function YamaguchiCamera() {
           />
         )}
 
-        {/* Zoom control (left side) */}
+        {/* Zoom toggle (left side) */}
         <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 z-20">
-          <div className="relative">
-            {activeMenu === 'zoom' && (
-              <div className="absolute bottom-full left-0 mb-3 flex flex-col items-center gap-1 p-1.5 rounded-2xl bg-white/[0.06] backdrop-blur-xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
-                <button
-                  type="button"
-                  onClick={() => setZoom(z => Math.min(zoomMax, +(z + ZOOM_STEP).toFixed(2)))}
-                  disabled={zoom >= zoomMax - 0.001}
-                  className="w-12 h-9 rounded-xl flex items-center justify-center text-gray-100 hover:bg-white/10 active:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                  aria-label="倍率を上げる"
-                >
-                  <Plus className="w-4 h-4" strokeWidth={2.4} />
-                </button>
-                <div className="my-0.5 px-2 py-1 rounded-lg bg-white text-black text-[11px] font-bold tabular-nums leading-none">
-                  {zoom.toFixed(1)}x
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setZoom(z => Math.max(zoomMin, +(z - ZOOM_STEP).toFixed(2)))}
-                  disabled={zoom <= zoomMin + 0.001}
-                  className="w-12 h-9 rounded-xl flex items-center justify-center text-gray-100 hover:bg-white/10 active:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                  aria-label="倍率を下げる"
-                >
-                  <Minus className="w-4 h-4" strokeWidth={2.4} />
-                </button>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setActiveMenu(m => m === 'zoom' ? null : 'zoom')}
-              className={`relative w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
-                activeMenu === 'zoom'
-                  ? 'bg-white text-black border-white scale-105 shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
-                  : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
-              }`}
-              aria-label="カメラ倍率"
-              aria-expanded={activeMenu === 'zoom'}
-            >
-              <ZoomIn className="w-[18px] h-[18px]" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveMenu(m => m === 'zoom' ? null : 'zoom')}
+            className={`relative w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
+              activeMenu === 'zoom'
+                ? 'bg-white text-black border-white scale-105 shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
+                : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
+            }`}
+            aria-label="カメラ倍率"
+            aria-expanded={activeMenu === 'zoom'}
+          >
+            <ZoomIn className="w-[18px] h-[18px]" />
+          </button>
         </div>
 
         {/* Frame controls (right side) */}
