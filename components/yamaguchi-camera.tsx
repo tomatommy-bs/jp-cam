@@ -109,6 +109,7 @@ const STROKE_OPTIONS = [
 export default function YamaguchiCamera() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cityIndex, setCityIndex] = useState(0);
@@ -125,6 +126,8 @@ export default function YamaguchiCamera() {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [showLocation, setShowLocation] = useState(true);
   const [showLocationPin, setShowLocationPin] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const [zoomCaps, setZoomCaps] = useState<{ min: number; max: number; step: number } | null>(null);
 
   const currentCity = CITIES[cityIndex];
 
@@ -181,6 +184,21 @@ export default function YamaguchiCamera() {
         if (videoRef.current) {
           videoRef.current.srcObject = s;
         }
+        const track = s.getVideoTracks()[0] || null;
+        videoTrackRef.current = track;
+        let caps: { min: number; max: number; step: number } | null = null;
+        const trackCaps = (track && typeof track.getCapabilities === 'function')
+          ? (track.getCapabilities() as MediaTrackCapabilities & { zoom?: { min?: number; max?: number; step?: number } })
+          : null;
+        if (trackCaps && trackCaps.zoom && typeof trackCaps.zoom.max === 'number' && trackCaps.zoom.max > (trackCaps.zoom.min ?? 1)) {
+          caps = {
+            min: trackCaps.zoom.min ?? 1,
+            max: trackCaps.zoom.max,
+            step: trackCaps.zoom.step && trackCaps.zoom.step > 0 ? trackCaps.zoom.step : 0.1,
+          };
+        }
+        setZoomCaps(caps);
+        setZoom(caps ? caps.min : 1);
         setError(null);
       } catch (e) {
         let msg = e.message || 'カメラを起動できませんでした';
@@ -196,12 +214,24 @@ export default function YamaguchiCamera() {
     return () => {
       cancelled = true;
       if (activeStream) activeStream.getTracks().forEach(t => t.stop());
+      videoTrackRef.current = null;
     };
   }, [facingMode]);
+
+  useEffect(() => {
+    const track = videoTrackRef.current;
+    if (!track || !zoomCaps) return;
+    track.applyConstraints({ advanced: [{ zoom } as MediaTrackConstraintSet] }).catch(() => {});
+  }, [zoom, zoomCaps]);
 
   const switchCamera = () => {
     setFacingMode(f => f === 'environment' ? 'user' : 'environment');
   };
+
+  const isDigitalZoom = !zoomCaps;
+  const zoomMin = zoomCaps ? zoomCaps.min : 1;
+  const zoomMax = zoomCaps ? zoomCaps.max : 5;
+  const zoomStep = zoomCaps ? zoomCaps.step : 0.1;
 
   const handleCapture = () => {
     const video = videoRef.current;
@@ -214,14 +244,20 @@ export default function YamaguchiCamera() {
     canvas.height = h;
     const ctx = canvas.getContext('2d');
 
+    const useCrop = isDigitalZoom && zoom > 1;
+    const sw = useCrop ? w / zoom : w;
+    const sh = useCrop ? h / zoom : h;
+    const sx = useCrop ? (w - sw) / 2 : 0;
+    const sy = useCrop ? (h - sh) / 2 : 0;
+
     if (facingMode === 'user') {
       ctx.save();
       ctx.translate(w, 0);
       ctx.scale(-1, 1);
-      ctx.drawImage(video, 0, 0, w, h);
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
       ctx.restore();
     } else {
-      ctx.drawImage(video, 0, 0, w, h);
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
     }
 
     const fillAttr = showFill 
@@ -355,13 +391,20 @@ export default function YamaguchiCamera() {
                 <div className="text-xs text-gray-400">カメラを起動中...</div>
               </div>
             )}
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              playsInline 
-              muted 
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
               className="absolute inset-0 w-full h-full object-cover"
-              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+              style={{
+                transform: [
+                  isDigitalZoom && zoom !== 1 ? `scale(${zoom})` : '',
+                  facingMode === 'user' ? 'scaleX(-1)' : '',
+                ].filter(Boolean).join(' ') || 'none',
+                transformOrigin: 'center center',
+                transition: 'transform 80ms linear',
+              }}
             />
             <svg 
               className="absolute inset-0 w-full h-full pointer-events-none"
@@ -418,6 +461,11 @@ export default function YamaguchiCamera() {
                 <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-[10px] tabular-nums">
                   {String(cityIndex + 1).padStart(2, '0')} / {CITIES.length}
                 </div>
+                {zoom > zoomMin + 0.001 && (
+                  <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-[10px] tabular-nums font-semibold">
+                    {zoom.toFixed(1)}x
+                  </div>
+                )}
                 {geoError ? null : (
                   <button
                     onClick={() => setShowLocation(s => !s)}
@@ -442,6 +490,30 @@ export default function YamaguchiCamera() {
                 )}
               </div>
             </div>
+
+            {/* Zoom quick controls */}
+            {!loading && (
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-3 flex items-center gap-1.5 bg-black/55 backdrop-blur-sm rounded-full px-2 py-1">
+                {(() => {
+                  const presets = [zoomMin, ...[2, 3, 5].filter(v => v <= zoomMax && v > zoomMin)];
+                  return presets.map(v => {
+                    const active = Math.abs(zoom - v) < 0.05;
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => setZoom(v)}
+                        className={`min-w-[34px] px-2 py-1 rounded-full text-[11px] tabular-nums transition-colors ${
+                          active ? 'bg-white text-black font-semibold' : 'text-gray-200 hover:bg-white/10'
+                        }`}
+                        aria-label={`ズーム ${v}倍`}
+                      >
+                        {v}x
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            )}
 
             {/* Settings panel overlay */}
             {showSettings && (
@@ -483,6 +555,16 @@ export default function YamaguchiCamera() {
                   </label>
                   <input type="range" min="0.3" max="2" step="0.05" value={scale}
                     onChange={e => setScale(parseFloat(e.target.value))}
+                    className="w-full accent-white"/>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-gray-400 flex justify-between mb-1 tracking-wide">
+                    <span>ZOOM{isDigitalZoom ? ' (デジタル)' : ''}</span>
+                    <span className="tabular-nums">{zoom.toFixed(2)}x</span>
+                  </label>
+                  <input type="range" min={zoomMin} max={zoomMax} step={zoomStep} value={zoom}
+                    onChange={e => setZoom(parseFloat(e.target.value))}
                     className="w-full accent-white"/>
                 </div>
 
