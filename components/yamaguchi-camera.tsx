@@ -101,7 +101,7 @@ const CITY_BOUNDS: Record<string, { north: number; south: number; east: number; 
 const COLORS = ['#ffffff', '#fbbf24', '#fb7185', '#60a5fa', '#34d399', '#a78bfa', '#000000'];
 
 const STROKE_OPTIONS = [
-  { id: 'thick', label: '太い', value: 2.2 },
+  { id: 'thick', label: '太い', value: 1.65 },
   { id: 'thin',  label: '細い', value: 0.8 },
   { id: 'none',  label: 'なし', value: 0 },
 ] as const;
@@ -116,7 +116,7 @@ export default function YamaguchiCamera() {
   const [color, setColor] = useState('#ffffff');
   const [opacity, setOpacity] = useState(0.9);
   const [scale, setScale] = useState(1);
-  const [strokeWidth, setStrokeWidth] = useState(2.2);
+  const [strokeWidth, setStrokeWidth] = useState(1.65);
   const [capturedImage, setCapturedImage] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
   const [showSettings, setShowSettings] = useState(false);
