@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Download, RotateCcw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin } from 'lucide-react';
+import { Camera, Download, RotateCcw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus } from 'lucide-react';
 
 const CITIES = [
   {
@@ -106,6 +106,10 @@ const STROKE_OPTIONS = [
   { id: 'none',  label: 'なし', value: 0 },
 ] as const;
 
+const SCALE_MIN = 0.3;
+const SCALE_MAX = 2;
+const SCALE_STEP = 0.1;
+
 function StrokeIcon({ value, className = 'w-5 h-5' }: { value: number; className?: string }) {
   if (value === 0) {
     return (
@@ -137,7 +141,7 @@ export default function YamaguchiCamera() {
   const [capturedImage, setCapturedImage] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
   const [showSettings, setShowSettings] = useState(false);
-  const [showStrokeMenu, setShowStrokeMenu] = useState(false);
+  const [activeMenu, setActiveMenu] = useState<'stroke' | 'size' | null>(null);
   const [maskMode, setMaskMode] = useState<'translucent' | 'solid'>('translucent');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -595,15 +599,6 @@ export default function YamaguchiCamera() {
 
                 <div>
                   <label className="text-[10px] text-gray-400 flex justify-between mb-1 tracking-wide">
-                    <span>SIZE</span><span className="tabular-nums">{scale.toFixed(2)}x</span>
-                  </label>
-                  <input type="range" min="0.3" max="2" step="0.05" value={scale}
-                    onChange={e => setScale(parseFloat(e.target.value))}
-                    className="w-full accent-white"/>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-gray-400 flex justify-between mb-1 tracking-wide">
                     <span>ZOOM{isDigitalZoom ? ' (デジタル)' : ''}</span>
                     <span className="tabular-nums">{zoom.toFixed(2)}x</span>
                   </label>
@@ -700,23 +695,69 @@ export default function YamaguchiCamera() {
           <div className="w-12 h-12 rounded-full bg-white group-active:bg-gray-300 transition-colors"></div>
         </button>
 
-        {/* Stroke control */}
-        <div className="absolute right-6 top-1/2 -translate-y-1/2">
-          {showStrokeMenu && (
-            <>
-              <button
-                type="button"
-                aria-label="閉じる"
-                onClick={() => setShowStrokeMenu(false)}
-                className="fixed inset-0 z-10 cursor-default"
-              />
-              <div className="absolute bottom-full right-0 mb-3 z-20 flex flex-col gap-1.5 p-1.5 rounded-2xl bg-white/[0.06] backdrop-blur-xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
+        {activeMenu && (
+          <button
+            type="button"
+            aria-label="閉じる"
+            onClick={() => setActiveMenu(null)}
+            className="fixed inset-0 z-10 cursor-default"
+          />
+        )}
+
+        {/* Frame controls (right side) */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 z-20">
+          {/* SIZE control */}
+          <div className="relative">
+            {activeMenu === 'size' && (
+              <div className="absolute bottom-full right-0 mb-3 flex flex-col items-center gap-1 p-1.5 rounded-2xl bg-white/[0.06] backdrop-blur-xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
+                <button
+                  type="button"
+                  onClick={() => setScale(s => Math.min(SCALE_MAX, +(s + SCALE_STEP).toFixed(2)))}
+                  disabled={scale >= SCALE_MAX - 0.001}
+                  className="w-12 h-9 rounded-xl flex items-center justify-center text-gray-100 hover:bg-white/10 active:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  aria-label="サイズを大きく"
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.4} />
+                </button>
+                <div className="my-0.5 px-2 py-1 rounded-lg bg-white text-black text-[11px] font-bold tabular-nums leading-none">
+                  {scale.toFixed(2)}x
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScale(s => Math.max(SCALE_MIN, +(s - SCALE_STEP).toFixed(2)))}
+                  disabled={scale <= SCALE_MIN + 0.001}
+                  className="w-12 h-9 rounded-xl flex items-center justify-center text-gray-100 hover:bg-white/10 active:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  aria-label="サイズを小さく"
+                >
+                  <Minus className="w-4 h-4" strokeWidth={2.4} />
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setActiveMenu(m => m === 'size' ? null : 'size')}
+              className={`relative w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
+                activeMenu === 'size'
+                  ? 'bg-white text-black border-white scale-105 shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
+                  : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
+              }`}
+              aria-label="シルエットサイズ"
+              aria-expanded={activeMenu === 'size'}
+            >
+              <Maximize2 className="w-[18px] h-[18px]" />
+            </button>
+          </div>
+
+          {/* Stroke control */}
+          <div className="relative">
+            {activeMenu === 'stroke' && (
+              <div className="absolute bottom-full right-0 mb-3 flex flex-col gap-1.5 p-1.5 rounded-2xl bg-white/[0.06] backdrop-blur-xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
                 {STROKE_OPTIONS.map(opt => {
                   const active = strokeWidth === opt.value;
                   return (
                     <button
                       key={opt.id}
-                      onClick={() => { setStrokeWidth(opt.value); setShowStrokeMenu(false); }}
+                      onClick={() => { setStrokeWidth(opt.value); setActiveMenu(null); }}
                       className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all ${
                         active
                           ? 'bg-white text-black shadow-lg'
@@ -731,21 +772,21 @@ export default function YamaguchiCamera() {
                   );
                 })}
               </div>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowStrokeMenu(s => !s)}
-            className={`relative w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
-              showStrokeMenu
-                ? 'bg-white text-black border-white scale-105 shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
-                : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
-            }`}
-            aria-label="枠線サイズ"
-            aria-expanded={showStrokeMenu}
-          >
-            <StrokeIcon value={strokeWidth} className="w-5 h-5" />
-          </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setActiveMenu(m => m === 'stroke' ? null : 'stroke')}
+              className={`relative w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
+                activeMenu === 'stroke'
+                  ? 'bg-white text-black border-white scale-105 shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
+                  : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
+              }`}
+              aria-label="枠線サイズ"
+              aria-expanded={activeMenu === 'stroke'}
+            >
+              <StrokeIcon value={strokeWidth} className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
