@@ -106,6 +106,23 @@ const STROKE_OPTIONS = [
   { id: 'none',  label: 'なし', value: 0 },
 ] as const;
 
+function StrokeIcon({ value, className = 'w-5 h-5' }: { value: number; className?: string }) {
+  if (value === 0) {
+    return (
+      <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3.5" y="3.5" width="17" height="17" rx="2" strokeDasharray="2 2.5" />
+        <line x1="5" y1="19" x2="19" y2="5" strokeWidth={1.6} />
+      </svg>
+    );
+  }
+  const sw = value >= 1.5 ? 3 : 1.4;
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
+    </svg>
+  );
+}
+
 export default function YamaguchiCamera() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -120,7 +137,7 @@ export default function YamaguchiCamera() {
   const [capturedImage, setCapturedImage] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
   const [showSettings, setShowSettings] = useState(false);
-  const [showFill, setShowFill] = useState(false);
+  const [showStrokeMenu, setShowStrokeMenu] = useState(false);
   const [maskMode, setMaskMode] = useState<'translucent' | 'solid'>('translucent');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -283,10 +300,6 @@ export default function YamaguchiCamera() {
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
     }
 
-    const fillAttr = showFill 
-      ? `fill="${color}" fill-opacity="${opacity * 0.18}"` 
-      : 'fill="none"';
-    
     const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice">
       <defs>
         <mask id="silhouette-mask">
@@ -298,7 +311,7 @@ export default function YamaguchiCamera() {
       </defs>
       <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="${maskMode === 'solid' ? 1 : 0.6}" mask="url(#silhouette-mask)" />
       <g transform="translate(100,100) scale(${scale}) translate(-100,-100)">
-        <path d="${currentCity.path}" ${fillAttr} stroke="${color}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>
+        <path d="${currentCity.path}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>
         ${dotPos ? `<circle cx="${dotPos.x}" cy="${dotPos.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
       </g>
     </svg>`;
@@ -458,10 +471,9 @@ export default function YamaguchiCamera() {
                 mask="url(#silhouette-mask)"
               />
               <g transform={`translate(100,100) scale(${scale}) translate(-100,-100)`}>
-                <path 
+                <path
                   d={currentCity.path}
-                  fill={showFill ? color : 'none'}
-                  fillOpacity={showFill ? opacity * 0.18 : 0}
+                  fill="none"
                   stroke={color}
                   strokeWidth={strokeWidth}
                   strokeLinejoin="round"
@@ -601,25 +613,6 @@ export default function YamaguchiCamera() {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide">STROKE</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {STROKE_OPTIONS.map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setStrokeWidth(opt.value)}
-                        className={`py-1.5 rounded text-[11px] transition-colors ${
-                          strokeWidth === opt.value
-                            ? 'bg-white text-black font-semibold'
-                            : 'bg-white/10 text-gray-200 hover:bg-white/20'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
                   <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide">MASK</label>
                   <div className="grid grid-cols-2 gap-1.5">
                     <button
@@ -646,20 +639,6 @@ export default function YamaguchiCamera() {
                 </div>
 
                 <label className="flex items-center justify-between text-xs cursor-pointer pt-1">
-                  <span className="text-gray-300">塗りつぶし</span>
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      checked={showFill}
-                      onChange={e => setShowFill(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-700 rounded-full peer-checked:bg-white transition-colors"></div>
-                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform ${showFill ? 'translate-x-4 bg-black' : 'bg-gray-300'}`}></div>
-                  </div>
-                </label>
-
-                <label className="flex items-center justify-between text-xs cursor-pointer">
                   <span className="text-gray-300">ロゴに現在地ピンを表示</span>
                   <div className="relative">
                     <input
@@ -711,7 +690,7 @@ export default function YamaguchiCamera() {
       </div>
 
       {/* Capture button */}
-      <div className="bg-black px-4 pt-3 pb-5 flex justify-center items-center">
+      <div className="bg-black px-4 pt-3 pb-5 relative flex justify-center items-center">
         <button
           onClick={handleCapture}
           disabled={!!error || loading}
@@ -720,6 +699,54 @@ export default function YamaguchiCamera() {
         >
           <div className="w-12 h-12 rounded-full bg-white group-active:bg-gray-300 transition-colors"></div>
         </button>
+
+        {/* Stroke control */}
+        <div className="absolute right-6 top-1/2 -translate-y-1/2">
+          {showStrokeMenu && (
+            <>
+              <button
+                type="button"
+                aria-label="閉じる"
+                onClick={() => setShowStrokeMenu(false)}
+                className="fixed inset-0 z-10 cursor-default"
+              />
+              <div className="absolute bottom-full right-0 mb-3 z-20 flex flex-col gap-1.5 p-1.5 rounded-2xl bg-white/[0.06] backdrop-blur-xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
+                {STROKE_OPTIONS.map(opt => {
+                  const active = strokeWidth === opt.value;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => { setStrokeWidth(opt.value); setShowStrokeMenu(false); }}
+                      className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all ${
+                        active
+                          ? 'bg-white text-black shadow-lg'
+                          : 'text-gray-200 hover:bg-white/10 active:bg-white/20'
+                      }`}
+                      aria-label={`枠線 ${opt.label}`}
+                      aria-pressed={active}
+                    >
+                      <StrokeIcon value={opt.value} className="w-5 h-5" />
+                      <span className="text-[9px] font-semibold tracking-wide">{opt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowStrokeMenu(s => !s)}
+            className={`relative w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
+              showStrokeMenu
+                ? 'bg-white text-black border-white scale-105 shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
+                : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
+            }`}
+            aria-label="枠線サイズ"
+            aria-expanded={showStrokeMenu}
+          >
+            <StrokeIcon value={strokeWidth} className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Captured image overlay */}
