@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Download, RotateCcw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus } from 'lucide-react';
+import { Camera, Download, RotateCcw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn } from 'lucide-react';
 
 const CITIES = [
   {
@@ -109,6 +109,7 @@ const STROKE_OPTIONS = [
 const SCALE_MIN = 0.3;
 const SCALE_MAX = 2;
 const SCALE_STEP = 0.1;
+const ZOOM_STEP = 0.5;
 
 function StrokeIcon({ value, className = 'w-5 h-5' }: { value: number; className?: string }) {
   if (value === 0) {
@@ -141,7 +142,7 @@ export default function YamaguchiCamera() {
   const [capturedImage, setCapturedImage] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
   const [showSettings, setShowSettings] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<'stroke' | 'size' | null>(null);
+  const [activeMenu, setActiveMenu] = useState<'stroke' | 'size' | 'zoom' | null>(null);
   const [maskMode, setMaskMode] = useState<'translucent' | 'solid'>('translucent');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -252,7 +253,6 @@ export default function YamaguchiCamera() {
   const isDigitalZoom = !zoomCaps;
   const zoomMin = zoomCaps ? zoomCaps.min : 1;
   const zoomMax = zoomCaps ? zoomCaps.max : 5;
-  const zoomStep = zoomCaps ? zoomCaps.step : 0.1;
 
   const handleCapture = () => {
     const video = videoRef.current;
@@ -539,30 +539,6 @@ export default function YamaguchiCamera() {
               </div>
             </div>
 
-            {/* Zoom quick controls */}
-            {!loading && (
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-3 flex items-center gap-1.5 bg-black/55 backdrop-blur-sm rounded-full px-2 py-1">
-                {(() => {
-                  const presets = [zoomMin, ...[2, 3, 5].filter(v => v <= zoomMax && v > zoomMin)];
-                  return presets.map(v => {
-                    const active = Math.abs(zoom - v) < 0.05;
-                    return (
-                      <button
-                        key={v}
-                        onClick={() => setZoom(v)}
-                        className={`min-w-[34px] px-2 py-1 rounded-full text-[11px] tabular-nums transition-colors ${
-                          active ? 'bg-white text-black font-semibold' : 'text-gray-200 hover:bg-white/10'
-                        }`}
-                        aria-label={`ズーム ${v}倍`}
-                      >
-                        {v}x
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-            )}
-
             {/* Settings panel overlay */}
             {showSettings && (
               <div className="absolute inset-x-0 bottom-0 bg-black/90 backdrop-blur-md p-4 space-y-3 z-30 border-t border-white/10">
@@ -594,16 +570,6 @@ export default function YamaguchiCamera() {
                   </label>
                   <input type="range" min="0.1" max="1" step="0.05" value={opacity} 
                     onChange={e => setOpacity(parseFloat(e.target.value))} 
-                    className="w-full accent-white"/>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-gray-400 flex justify-between mb-1 tracking-wide">
-                    <span>ZOOM{isDigitalZoom ? ' (デジタル)' : ''}</span>
-                    <span className="tabular-nums">{zoom.toFixed(2)}x</span>
-                  </label>
-                  <input type="range" min={zoomMin} max={zoomMax} step={zoomStep} value={zoom}
-                    onChange={e => setZoom(parseFloat(e.target.value))}
                     className="w-full accent-white"/>
                 </div>
 
@@ -703,6 +669,50 @@ export default function YamaguchiCamera() {
             className="fixed inset-0 z-10 cursor-default"
           />
         )}
+
+        {/* Zoom control (left side) */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 z-20">
+          <div className="relative">
+            {activeMenu === 'zoom' && (
+              <div className="absolute bottom-full left-0 mb-3 flex flex-col items-center gap-1 p-1.5 rounded-2xl bg-white/[0.06] backdrop-blur-xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
+                <button
+                  type="button"
+                  onClick={() => setZoom(z => Math.min(zoomMax, +(z + ZOOM_STEP).toFixed(2)))}
+                  disabled={zoom >= zoomMax - 0.001}
+                  className="w-12 h-9 rounded-xl flex items-center justify-center text-gray-100 hover:bg-white/10 active:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  aria-label="倍率を上げる"
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.4} />
+                </button>
+                <div className="my-0.5 px-2 py-1 rounded-lg bg-white text-black text-[11px] font-bold tabular-nums leading-none">
+                  {zoom.toFixed(1)}x
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setZoom(z => Math.max(zoomMin, +(z - ZOOM_STEP).toFixed(2)))}
+                  disabled={zoom <= zoomMin + 0.001}
+                  className="w-12 h-9 rounded-xl flex items-center justify-center text-gray-100 hover:bg-white/10 active:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  aria-label="倍率を下げる"
+                >
+                  <Minus className="w-4 h-4" strokeWidth={2.4} />
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setActiveMenu(m => m === 'zoom' ? null : 'zoom')}
+              className={`relative w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
+                activeMenu === 'zoom'
+                  ? 'bg-white text-black border-white scale-105 shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
+                  : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
+              }`}
+              aria-label="カメラ倍率"
+              aria-expanded={activeMenu === 'zoom'}
+            >
+              <ZoomIn className="w-[18px] h-[18px]" />
+            </button>
+          </div>
+        </div>
 
         {/* Frame controls (right side) */}
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 z-20">
