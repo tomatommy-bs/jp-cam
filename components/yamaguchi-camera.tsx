@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Download, RotateCcw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn } from 'lucide-react';
+import { addPngTextChunks } from '@/lib/png-metadata';
 
 const CITIES = [
   {
@@ -368,7 +369,22 @@ export default function YamaguchiCamera() {
     };
     
     const finalize = () => {
-      const dataUrl = canvas.toDataURL('image/png');
+      const rawDataUrl = canvas.toDataURL('image/png');
+      const capturedAt = new Date();
+      const metadata: Record<string, string> = {
+        Title: `山口県 ${currentCity.name}`,
+        Software: 'YAMAGUCHI 13',
+        'Creation Time': capturedAt.toISOString(),
+        Location: `山口県 ${currentCity.name} (${currentCity.reading})`,
+      };
+      if (userCoords) {
+        metadata.GPSLatitude = userCoords.lat.toFixed(6);
+        metadata.GPSLongitude = userCoords.lng.toFixed(6);
+        metadata.Comment = `山口県${currentCity.name}にて ${capturedAt.toLocaleString('ja-JP')} / GPS ${userCoords.lat.toFixed(6)},${userCoords.lng.toFixed(6)}`;
+      } else {
+        metadata.Comment = `山口県${currentCity.name}にて ${capturedAt.toLocaleString('ja-JP')}`;
+      }
+      const dataUrl = addPngTextChunks(rawDataUrl, metadata);
       setCapturedImage(dataUrl);
       downloadDataUrl(dataUrl);
       URL.revokeObjectURL(url);
