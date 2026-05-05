@@ -96,6 +96,9 @@ const CITY_BOUNDS: Record<string, { north: number; south: number; east: number; 
   hikari:      { north: 34.10, south: 33.90, east: 132.00, west: 131.85 },
   nagato:      { north: 34.55, south: 34.30, east: 131.30, west: 131.05 },
   yanai:       { north: 34.00, south: 33.85, east: 132.20, west: 132.05 },
+  mine:          { north: 34.40, south: 34.10, east: 131.40, west: 131.05 },
+  shunan:        { north: 34.30, south: 33.95, east: 132.05, west: 131.55 },
+  'sanyo-onoda': { north: 34.10, south: 33.90, east: 131.25, west: 131.05 },
 };
 
 const COLORS = ['#ffffff', '#fbbf24', '#fb7185', '#60a5fa', '#34d399', '#a78bfa', '#000000'];
