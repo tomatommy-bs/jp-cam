@@ -94,7 +94,7 @@ const CITY_BOUNDS: Record<string, { north: number; south: number; east: number; 
   kudamatsu:   { north: 34.15, south: 33.95, east: 132.00, west: 131.85 },
   iwakuni:     { north: 34.45, south: 33.95, east: 132.20, west: 131.80 },
   hikari:      { north: 34.10, south: 33.90, east: 132.00, west: 131.85 },
-  nagato:      { north: 34.45, south: 34.10, east: 131.30, west: 131.00 },
+  nagato:      { north: 34.54, south: 34.16, east: 131.37, west: 130.90 },
   yanai:       { north: 34.00, south: 33.85, east: 132.20, west: 132.05 },
   mine:          { north: 34.40, south: 34.10, east: 131.40, west: 131.05 },
   shunan:        { north: 34.30, south: 33.95, east: 132.05, west: 131.55 },
