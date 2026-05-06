@@ -408,21 +408,13 @@ export default function YamaguchiCamera() {
       ctx.save();
       ctx.translate(iconRight - iconSize, iconBottom - iconSize);
       ctx.scale(iconSize / 200, iconSize / 200);
-      ctx.save();
-      if (silhouetteRotated) {
-        ctx.translate(100, 100);
-        ctx.rotate(Math.PI / 2);
-        ctx.translate(-100, -100);
-      }
       const path = new Path2D(currentCity.path);
       ctx.fillStyle = color;
       ctx.globalAlpha = Math.min(opacity + 0.1, 1) * 0.9;
       ctx.fill(path);
-      ctx.restore();
       if (dotPosRaw && showLocationPin) {
-        // 90° CW around (100,100): (x,y) → (200 - y, x). Pin emoji stays upright.
-        const pinX = silhouetteRotated ? 200 - dotPosRaw.y : dotPosRaw.x;
-        const pinY = silhouetteRotated ? dotPosRaw.x : dotPosRaw.y;
+        const pinX = dotPosRaw.x;
+        const pinY = dotPosRaw.y;
         ctx.globalAlpha = 1;
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.shadowBlur = 4;
