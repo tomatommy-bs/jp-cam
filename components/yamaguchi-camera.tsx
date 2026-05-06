@@ -86,7 +86,7 @@ const CITIES = [
 
 // 各市の概算バウンディングボックス（緯度経度）。矩形近似のため海岸線などで多少のズレあり。
 const CITY_BOUNDS: Record<string, { north: number; south: number; east: number; west: number }> = {
-  shimonoseki: { north: 34.30, south: 33.95, east: 131.10, west: 130.85 },
+  shimonoseki: { north: 34.40, south: 33.93, east: 131.15, west: 130.83 },
   ube:         { north: 34.10, south: 33.92, east: 131.45, west: 131.20 },
   yamaguchi:   { north: 34.40, south: 34.00, east: 131.65, west: 131.30 },
   hagi:        { north: 34.65, south: 34.20, east: 131.80, west: 131.25 },
