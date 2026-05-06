@@ -178,6 +178,7 @@ export default function YamaguchiCamera() {
   const [capturedRaw, setCapturedRaw] = useState<string | null>(null);
   const [capturedSnapshot, setCapturedSnapshot] = useState<CapturedSnapshot | null>(null);
   const [previewMaskMode, setPreviewMaskMode] = useState<'translucent' | 'solid'>('translucent');
+  const [previewStrokeWidth, setPreviewStrokeWidth] = useState<number>(1.65);
   const [facingMode, setFacingMode] = useState('environment');
   const [showSettings, setShowSettings] = useState(false);
   const [activeMenu, setActiveMenu] = useState<'stroke' | 'size' | 'zoom' | null>(null);
@@ -404,14 +405,16 @@ export default function YamaguchiCamera() {
     setCapturedRaw(rawDataUrl);
     setCapturedSnapshot(snapshot);
     setPreviewMaskMode(maskMode);
+    setPreviewStrokeWidth(strokeWidth);
 
-    const composed = await composeFinal(rawDataUrl, maskMode, snapshot);
+    const composed = await composeFinal(rawDataUrl, maskMode, strokeWidth, snapshot);
     setCapturedImage(composed);
   };
 
   const composeFinal = (
     rawDataUrl: string,
     mode: 'translucent' | 'solid',
+    stroke: number,
     snap: CapturedSnapshot,
   ): Promise<string> => {
     return new Promise((resolve) => {
@@ -486,7 +489,7 @@ export default function YamaguchiCamera() {
       </defs>
       <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="${mode === 'solid' ? 1 : 0.6}" mask="url(#silhouette-mask)" />
       <g transform="${snap.silhouetteTransform}">
-        <path d="${snap.cityPath}" fill="none" stroke="${snap.color}" stroke-width="${snap.strokeWidth}" stroke-linejoin="round" stroke-linecap="round" opacity="${snap.opacity}"/>
+        <path d="${snap.cityPath}" fill="none" stroke="${snap.color}" stroke-width="${stroke}" stroke-linejoin="round" stroke-linecap="round" opacity="${snap.opacity}"/>
         ${snap.dotPos ? `<circle cx="${snap.dotPos.x}" cy="${snap.dotPos.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
       </g>
     </svg>`;
@@ -520,7 +523,15 @@ export default function YamaguchiCamera() {
     if (mode === previewMaskMode) return;
     if (!capturedRaw || !capturedSnapshot) return;
     setPreviewMaskMode(mode);
-    const composed = await composeFinal(capturedRaw, mode, capturedSnapshot);
+    const composed = await composeFinal(capturedRaw, mode, previewStrokeWidth, capturedSnapshot);
+    setCapturedImage(composed);
+  };
+
+  const handleSetPreviewStroke = async (value: number) => {
+    if (value === previewStrokeWidth) return;
+    if (!capturedRaw || !capturedSnapshot) return;
+    setPreviewStrokeWidth(value);
+    const composed = await composeFinal(capturedRaw, previewMaskMode, value, capturedSnapshot);
     setCapturedImage(composed);
   };
 
@@ -988,6 +999,30 @@ export default function YamaguchiCamera() {
                 >
                   塗りつぶし黒
                 </button>
+              </div>
+            </div>
+            <div className="w-full max-w-xs">
+              <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide text-center">枠線</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {STROKE_OPTIONS.map(opt => {
+                  const active = previewStrokeWidth === opt.value;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleSetPreviewStroke(opt.value)}
+                      className={`py-2 rounded flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                        active
+                          ? 'bg-white text-black font-semibold'
+                          : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                      }`}
+                      aria-label={`枠線 ${opt.label}`}
+                      aria-pressed={active}
+                    >
+                      <StrokeIcon value={opt.value} className="w-4 h-4" />
+                      <span className="text-[10px] tracking-wide">{opt.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="flex gap-3 justify-center">
