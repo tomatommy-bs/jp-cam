@@ -667,20 +667,7 @@ export default function YamaguchiCamera() {
       </div>
 
       {/* Capture button */}
-      <div className="bg-black px-4 pt-3 pb-5 relative flex justify-center items-center gap-4">
-        <button
-          type="button"
-          onClick={() => setSilhouetteRotated(r => !r)}
-          className={`w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
-            silhouetteRotated
-              ? 'bg-white text-black border-white shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
-              : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
-          }`}
-          aria-label="シルエットを回転"
-          aria-pressed={silhouetteRotated}
-        >
-          <RotateCw className="w-[18px] h-[18px]" />
-        </button>
+      <div className="bg-black px-4 pt-3 pb-5 relative flex justify-center items-center">
         <button
           onClick={handleCapture}
           disabled={!!error || loading}
@@ -699,7 +686,7 @@ export default function YamaguchiCamera() {
           />
         )}
 
-        {/* Zoom control (left side) */}
+        {/* Left controls (zoom + rotate) */}
         <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 z-20">
           <div className="relative">
             {activeMenu === 'zoom' && (
@@ -741,6 +728,19 @@ export default function YamaguchiCamera() {
               <ZoomIn className="w-[18px] h-[18px]" />
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setSilhouetteRotated(r => !r)}
+            className={`w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
+              silhouetteRotated
+                ? 'bg-white text-black border-white shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
+                : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
+            }`}
+            aria-label="シルエットを回転"
+            aria-pressed={silhouetteRotated}
+          >
+            <RotateCw className="w-[18px] h-[18px]" />
+          </button>
         </div>
 
         {/* Frame controls (right side) */}
