@@ -114,6 +114,21 @@ const SCALE_MAX = 2;
 const SCALE_STEP = 0.1;
 const ZOOM_STEP = 0.5;
 
+const SETTINGS_STORAGE_KEY = 'yamaguchi-camera-settings';
+
+type PersistedSettings = {
+  cityIndex: number;
+  color: string;
+  opacity: number;
+  scale: number;
+  strokeWidth: number;
+  facingMode: string;
+  maskMode: 'translucent' | 'solid';
+  showLocation: boolean;
+  showLocationPin: boolean;
+  silhouetteRotated: boolean;
+};
+
 function StrokeIcon({ value, className = 'w-5 h-5' }: { value: number; className?: string }) {
   if (value === 0) {
     return (
@@ -135,6 +150,7 @@ export default function YamaguchiCamera() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
+  const settingsLoadedRef = useRef(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cityIndex, setCityIndex] = useState(0);
@@ -158,6 +174,45 @@ export default function YamaguchiCamera() {
   const silhouetteTransform = `translate(100,100) ${silhouetteRotated ? 'rotate(90)' : ''} scale(${scale}) translate(-100,-100)`;
 
   const currentCity = CITIES[cityIndex];
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (raw) {
+        const s = JSON.parse(raw) as Partial<PersistedSettings>;
+        if (typeof s.cityIndex === 'number' && s.cityIndex >= 0 && s.cityIndex < CITIES.length) setCityIndex(s.cityIndex);
+        if (typeof s.color === 'string') setColor(s.color);
+        if (typeof s.opacity === 'number') setOpacity(s.opacity);
+        if (typeof s.scale === 'number') setScale(s.scale);
+        if (typeof s.strokeWidth === 'number') setStrokeWidth(s.strokeWidth);
+        if (s.facingMode === 'environment' || s.facingMode === 'user') setFacingMode(s.facingMode);
+        if (s.maskMode === 'translucent' || s.maskMode === 'solid') setMaskMode(s.maskMode);
+        if (typeof s.showLocation === 'boolean') setShowLocation(s.showLocation);
+        if (typeof s.showLocationPin === 'boolean') setShowLocationPin(s.showLocationPin);
+        if (typeof s.silhouetteRotated === 'boolean') setSilhouetteRotated(s.silhouetteRotated);
+      }
+    } catch {}
+    settingsLoadedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!settingsLoadedRef.current) return;
+    try {
+      const s: PersistedSettings = {
+        cityIndex,
+        color,
+        opacity,
+        scale,
+        strokeWidth,
+        facingMode,
+        maskMode,
+        showLocation,
+        showLocationPin,
+        silhouetteRotated,
+      };
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(s));
+    } catch {}
+  }, [cityIndex, color, opacity, scale, strokeWidth, facingMode, maskMode, showLocation, showLocationPin, silhouetteRotated]);
 
   useEffect(() => {
     if (!('geolocation' in navigator)) {
