@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Download, RotateCcw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn } from 'lucide-react';
+import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn } from 'lucide-react';
 
 const CITIES = [
   {
@@ -153,6 +153,9 @@ export default function YamaguchiCamera() {
   const [showLocationPin, setShowLocationPin] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [zoomCaps, setZoomCaps] = useState<{ min: number; max: number; step: number } | null>(null);
+  const [silhouetteRotated, setSilhouetteRotated] = useState(false);
+
+  const silhouetteTransform = `translate(100,100) ${silhouetteRotated ? 'rotate(90)' : ''} scale(${scale}) translate(-100,-100)`;
 
   const currentCity = CITIES[cityIndex];
 
@@ -311,13 +314,13 @@ export default function YamaguchiCamera() {
       <defs>
         <mask id="silhouette-mask">
           <rect x="-500" y="-500" width="1200" height="1200" fill="white" />
-          <g transform="translate(100,100) scale(${scale}) translate(-100,-100)">
+          <g transform="${silhouetteTransform}">
             <path d="${currentCity.path}" fill="black" />
           </g>
         </mask>
       </defs>
       <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="${maskMode === 'solid' ? 1 : 0.6}" mask="url(#silhouette-mask)" />
-      <g transform="translate(100,100) scale(${scale}) translate(-100,-100)">
+      <g transform="${silhouetteTransform}">
         <path d="${currentCity.path}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>
         ${dotPos ? `<circle cx="${dotPos.x}" cy="${dotPos.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
       </g>
@@ -350,18 +353,28 @@ export default function YamaguchiCamera() {
       ctx.save();
       ctx.translate(iconRight - iconSize, iconBottom - iconSize);
       ctx.scale(iconSize / 200, iconSize / 200);
+      ctx.save();
+      if (silhouetteRotated) {
+        ctx.translate(100, 100);
+        ctx.rotate(Math.PI / 2);
+        ctx.translate(-100, -100);
+      }
       const path = new Path2D(currentCity.path);
       ctx.fillStyle = color;
       ctx.globalAlpha = Math.min(opacity + 0.1, 1) * 0.9;
       ctx.fill(path);
+      ctx.restore();
       if (dotPosRaw && showLocationPin) {
+        // 90° CW around (100,100): (x,y) → (200 - y, x). Pin emoji stays upright.
+        const pinX = silhouetteRotated ? 200 - dotPosRaw.y : dotPosRaw.x;
+        const pinY = silhouetteRotated ? dotPosRaw.x : dotPosRaw.y;
         ctx.globalAlpha = 1;
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.shadowBlur = 4;
         ctx.font = '32px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'alphabetic';
-        ctx.fillText('📍', dotPosRaw.x, dotPosRaw.y + 4);
+        ctx.fillText('📍', pinX, pinY + 4);
         ctx.shadowBlur = 0;
       }
       ctx.restore();
@@ -466,7 +479,7 @@ export default function YamaguchiCamera() {
               <defs>
                 <mask id="silhouette-mask">
                   <rect x="-500" y="-500" width="1200" height="1200" fill="white" />
-                  <g transform={`translate(100,100) scale(${scale}) translate(-100,-100)`}>
+                  <g transform={silhouetteTransform}>
                     <path d={currentCity.path} fill="black" />
                   </g>
                 </mask>
@@ -477,7 +490,7 @@ export default function YamaguchiCamera() {
                 fillOpacity={maskMode === 'solid' ? 1 : 0.6}
                 mask="url(#silhouette-mask)"
               />
-              <g transform={`translate(100,100) scale(${scale}) translate(-100,-100)`}>
+              <g transform={silhouetteTransform}>
                 <path
                   d={currentCity.path}
                   fill="none"
@@ -673,7 +686,7 @@ export default function YamaguchiCamera() {
           />
         )}
 
-        {/* Zoom control (left side) */}
+        {/* Left controls (zoom + rotate) */}
         <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 z-20">
           <div className="relative">
             {activeMenu === 'zoom' && (
@@ -715,6 +728,19 @@ export default function YamaguchiCamera() {
               <ZoomIn className="w-[18px] h-[18px]" />
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setSilhouetteRotated(r => !r)}
+            className={`w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all ${
+              silhouetteRotated
+                ? 'bg-white text-black border-white shadow-[0_0_0_4px_rgba(255,255,255,0.1)]'
+                : 'bg-white/[0.08] text-white border-white/20 hover:bg-white/15 active:bg-white/25'
+            }`}
+            aria-label="シルエットを回転"
+            aria-pressed={silhouetteRotated}
+          >
+            <RotateCw className="w-[18px] h-[18px]" />
+          </button>
         </div>
 
         {/* Frame controls (right side) */}
