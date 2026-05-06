@@ -129,6 +129,22 @@ type PersistedSettings = {
   silhouetteRotated: boolean;
 };
 
+type CapturedSnapshot = {
+  width: number;
+  height: number;
+  cityId: string;
+  cityName: string;
+  cityReading: string;
+  cityPath: string;
+  silhouetteTransform: string;
+  color: string;
+  opacity: number;
+  strokeWidth: number;
+  dotPos: { x: number; y: number } | null;
+  dotPosRaw: { x: number; y: number } | null;
+  showLocationPin: boolean;
+};
+
 function StrokeIcon({ value, className = 'w-5 h-5' }: { value: number; className?: string }) {
   if (value === 0) {
     return (
@@ -158,7 +174,11 @@ export default function YamaguchiCamera() {
   const [opacity, setOpacity] = useState(0.9);
   const [scale, setScale] = useState(1);
   const [strokeWidth, setStrokeWidth] = useState(1.65);
-  const [capturedImage, setCapturedImage] = useState(null);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedRaw, setCapturedRaw] = useState<string | null>(null);
+  const [capturedSnapshot, setCapturedSnapshot] = useState<CapturedSnapshot | null>(null);
+  const [previewMaskMode, setPreviewMaskMode] = useState<'translucent' | 'solid'>('translucent');
+  const [previewStrokeWidth, setPreviewStrokeWidth] = useState<number>(1.65);
   const [facingMode, setFacingMode] = useState('environment');
   const [showSettings, setShowSettings] = useState(false);
   const [activeMenu, setActiveMenu] = useState<'stroke' | 'size' | 'zoom' | null>(null);
@@ -315,7 +335,7 @@ export default function YamaguchiCamera() {
   const zoomMin = zoomCaps ? zoomCaps.min : 1;
   const zoomMax = zoomCaps ? zoomCaps.max : 5;
 
-  const handleCapture = () => {
+  const handleCapture = async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !video.videoWidth) return;
@@ -365,94 +385,166 @@ export default function YamaguchiCamera() {
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
     }
 
-    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice">
+    const rawDataUrl = canvas.toDataURL('image/png');
+    const snapshot: CapturedSnapshot = {
+      width: w,
+      height: h,
+      cityId: currentCity.id,
+      cityName: currentCity.name,
+      cityReading: currentCity.reading,
+      cityPath: currentCity.path,
+      silhouetteTransform,
+      color,
+      opacity,
+      strokeWidth,
+      dotPos,
+      dotPosRaw,
+      showLocationPin,
+    };
+
+    setCapturedRaw(rawDataUrl);
+    setCapturedSnapshot(snapshot);
+    setPreviewMaskMode(maskMode);
+    setPreviewStrokeWidth(strokeWidth);
+
+    const composed = await composeFinal(rawDataUrl, maskMode, strokeWidth, snapshot);
+    setCapturedImage(composed);
+  };
+
+  const composeFinal = (
+    rawDataUrl: string,
+    mode: 'translucent' | 'solid',
+    stroke: number,
+    snap: CapturedSnapshot,
+  ): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = snap.width;
+      canvas.height = snap.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(rawDataUrl);
+        return;
+      }
+
+      const drawWatermark = () => {
+        const w = snap.width;
+        const h = snap.height;
+        const fontSize = Math.max(18, Math.floor(h / 32));
+        ctx.font = `bold ${fontSize}px -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.fillStyle = snap.color;
+        ctx.globalAlpha = Math.min(snap.opacity + 0.1, 1);
+        ctx.fillText(`山口県 ${snap.cityName}`, w - 28, h - 28);
+        const subSize = Math.max(10, Math.floor(fontSize * 0.45));
+        ctx.font = `${subSize}px -apple-system, sans-serif`;
+        ctx.globalAlpha = Math.min(snap.opacity + 0.1, 1) * 0.75;
+        ctx.fillText(snap.cityReading, w - 28, h - 28 - fontSize - 4);
+
+        const iconSize = fontSize * 2;
+        const iconRight = w - 28;
+        const iconBottom = h - 28 - fontSize - 4 - subSize - 6;
+        ctx.save();
+        ctx.translate(iconRight - iconSize, iconBottom - iconSize);
+        ctx.scale(iconSize / 200, iconSize / 200);
+        const path = new Path2D(snap.cityPath);
+        ctx.fillStyle = snap.color;
+        ctx.globalAlpha = Math.min(snap.opacity + 0.1, 1) * 0.9;
+        ctx.fill(path);
+        if (snap.dotPosRaw && snap.showLocationPin) {
+          const pinX = snap.dotPosRaw.x;
+          const pinY = snap.dotPosRaw.y;
+          ctx.globalAlpha = 1;
+          ctx.shadowColor = 'rgba(0,0,0,0.6)';
+          ctx.shadowBlur = 4;
+          ctx.font = '32px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'alphabetic';
+          ctx.fillText('📍', pinX, pinY + 4);
+          ctx.shadowBlur = 0;
+        }
+        ctx.restore();
+
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+      };
+
+      const rawImg = new Image();
+      rawImg.onload = () => {
+        ctx.drawImage(rawImg, 0, 0, snap.width, snap.height);
+
+        const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="${snap.width}" height="${snap.height}" preserveAspectRatio="xMidYMid slice">
       <defs>
         <mask id="silhouette-mask">
           <rect x="-500" y="-500" width="1200" height="1200" fill="white" />
-          <g transform="${silhouetteTransform}">
-            <path d="${currentCity.path}" fill="black" />
+          <g transform="${snap.silhouetteTransform}">
+            <path d="${snap.cityPath}" fill="black" />
           </g>
         </mask>
       </defs>
-      <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="${maskMode === 'solid' ? 1 : 0.6}" mask="url(#silhouette-mask)" />
-      <g transform="${silhouetteTransform}">
-        <path d="${currentCity.path}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>
-        ${dotPos ? `<circle cx="${dotPos.x}" cy="${dotPos.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
+      <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="${mode === 'solid' ? 1 : 0.6}" mask="url(#silhouette-mask)" />
+      <g transform="${snap.silhouetteTransform}">
+        <path d="${snap.cityPath}" fill="none" stroke="${snap.color}" stroke-width="${stroke}" stroke-linejoin="round" stroke-linecap="round" opacity="${snap.opacity}"/>
+        ${snap.dotPos ? `<circle cx="${snap.dotPos.x}" cy="${snap.dotPos.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
       </g>
     </svg>`;
 
-    const img = new Image();
-    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    
-    const drawWatermark = () => {
-      const fontSize = Math.max(18, Math.floor(h / 32));
-      ctx.font = `bold ${fontSize}px -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'bottom';
-      ctx.shadowColor = 'rgba(0,0,0,0.7)';
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
-      ctx.fillStyle = color;
-      ctx.globalAlpha = Math.min(opacity + 0.1, 1);
-      ctx.fillText(`山口県 ${currentCity.name}`, w - 28, h - 28);
-      const subSize = Math.max(10, Math.floor(fontSize * 0.45));
-      ctx.font = `${subSize}px -apple-system, sans-serif`;
-      ctx.globalAlpha = Math.min(opacity + 0.1, 1) * 0.75;
-      ctx.fillText(currentCity.reading, w - 28, h - 28 - fontSize - 4);
+        const svgImg = new Image();
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
 
-      const iconSize = fontSize * 2;
-      const iconRight = w - 28;
-      const iconBottom = h - 28 - fontSize - 4 - subSize - 6;
-      ctx.save();
-      ctx.translate(iconRight - iconSize, iconBottom - iconSize);
-      ctx.scale(iconSize / 200, iconSize / 200);
-      const path = new Path2D(currentCity.path);
-      ctx.fillStyle = color;
-      ctx.globalAlpha = Math.min(opacity + 0.1, 1) * 0.9;
-      ctx.fill(path);
-      if (dotPosRaw && showLocationPin) {
-        const pinX = dotPosRaw.x;
-        const pinY = dotPosRaw.y;
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.shadowBlur = 4;
-        ctx.font = '32px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText('📍', pinX, pinY + 4);
-        ctx.shadowBlur = 0;
-      }
-      ctx.restore();
+        const finalize = () => {
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL('image/png'));
+        };
 
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-    };
-    
-    const finalize = () => {
-      const dataUrl = canvas.toDataURL('image/png');
-      setCapturedImage(dataUrl);
-      downloadDataUrl(dataUrl);
-      URL.revokeObjectURL(url);
-    };
-
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, w, h);
-      drawWatermark();
-      finalize();
-    };
-    img.onerror = () => {
-      drawWatermark();
-      finalize();
-    };
-    img.src = url;
+        svgImg.onload = () => {
+          ctx.drawImage(svgImg, 0, 0, snap.width, snap.height);
+          drawWatermark();
+          finalize();
+        };
+        svgImg.onerror = () => {
+          drawWatermark();
+          finalize();
+        };
+        svgImg.src = url;
+      };
+      rawImg.onerror = () => resolve(rawDataUrl);
+      rawImg.src = rawDataUrl;
+    });
   };
 
-  const downloadDataUrl = (dataUrl: string) => {
+  const handleTogglePreviewMask = async (mode: 'translucent' | 'solid') => {
+    if (mode === previewMaskMode) return;
+    if (!capturedRaw || !capturedSnapshot) return;
+    setPreviewMaskMode(mode);
+    const composed = await composeFinal(capturedRaw, mode, previewStrokeWidth, capturedSnapshot);
+    setCapturedImage(composed);
+  };
+
+  const handleSetPreviewStroke = async (value: number) => {
+    if (value === previewStrokeWidth) return;
+    if (!capturedRaw || !capturedSnapshot) return;
+    setPreviewStrokeWidth(value);
+    const composed = await composeFinal(capturedRaw, previewMaskMode, value, capturedSnapshot);
+    setCapturedImage(composed);
+  };
+
+  const handleRetake = () => {
+    setCapturedImage(null);
+    setCapturedRaw(null);
+    setCapturedSnapshot(null);
+  };
+
+  const downloadDataUrl = (dataUrl: string, cityId: string) => {
     const link = document.createElement('a');
     link.href = dataUrl;
-    link.download = `yamaguchi_${currentCity.id}_${Date.now()}.png`;
+    link.download = `yamaguchi_${cityId}_${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -460,7 +552,8 @@ export default function YamaguchiCamera() {
 
   const handleDownload = () => {
     if (!capturedImage) return;
-    downloadDataUrl(capturedImage);
+    const cityId = capturedSnapshot?.cityId ?? currentCity.id;
+    downloadDataUrl(capturedImage, cityId);
   };
 
   return (
@@ -882,21 +975,72 @@ export default function YamaguchiCamera() {
           <div className="flex-1 overflow-auto flex items-center justify-center p-3">
             <img src={capturedImage} alt="撮影された写真" className="max-w-full max-h-full object-contain rounded shadow-2xl" />
           </div>
-          <div className="bg-black p-4 pb-5 flex gap-3 justify-center">
-            <button
-              onClick={() => setCapturedImage(null)}
-              className="px-5 py-3 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center gap-2 text-sm transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" />
-              撮り直す
-            </button>
-            <button
-              onClick={handleDownload}
-              className="px-6 py-3 rounded-full bg-white text-black hover:bg-gray-200 active:bg-gray-300 flex items-center gap-2 font-semibold text-sm transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              ダウンロード
-            </button>
+          <div className="bg-black p-4 pb-5 flex flex-col gap-3 items-center">
+            <div className="w-full max-w-xs">
+              <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide text-center">枠外</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={() => handleTogglePreviewMask('translucent')}
+                  className={`py-2 rounded text-[12px] transition-colors ${
+                    previewMaskMode === 'translucent'
+                      ? 'bg-white text-black font-semibold'
+                      : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                  }`}
+                >
+                  半透明
+                </button>
+                <button
+                  onClick={() => handleTogglePreviewMask('solid')}
+                  className={`py-2 rounded text-[12px] transition-colors ${
+                    previewMaskMode === 'solid'
+                      ? 'bg-white text-black font-semibold'
+                      : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                  }`}
+                >
+                  塗りつぶし黒
+                </button>
+              </div>
+            </div>
+            <div className="w-full max-w-xs">
+              <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide text-center">枠線</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {STROKE_OPTIONS.map(opt => {
+                  const active = previewStrokeWidth === opt.value;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleSetPreviewStroke(opt.value)}
+                      className={`py-2 rounded flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                        active
+                          ? 'bg-white text-black font-semibold'
+                          : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                      }`}
+                      aria-label={`枠線 ${opt.label}`}
+                      aria-pressed={active}
+                    >
+                      <StrokeIcon value={opt.value} className="w-4 h-4" />
+                      <span className="text-[10px] tracking-wide">{opt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={handleRetake}
+                className="px-5 py-3 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center gap-2 text-sm transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                撮り直す
+              </button>
+              <button
+                onClick={handleDownload}
+                className="px-6 py-3 rounded-full bg-white text-black hover:bg-gray-200 active:bg-gray-300 flex items-center gap-2 font-semibold text-sm transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                保存
+              </button>
+            </div>
           </div>
         </div>
       )}
