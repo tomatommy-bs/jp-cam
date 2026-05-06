@@ -179,6 +179,7 @@ export default function YamaguchiCamera() {
   const [capturedSnapshot, setCapturedSnapshot] = useState<CapturedSnapshot | null>(null);
   const [previewMaskMode, setPreviewMaskMode] = useState<'translucent' | 'solid'>('translucent');
   const [previewStrokeWidth, setPreviewStrokeWidth] = useState<number>(1.65);
+  const [previewShowLocation, setPreviewShowLocation] = useState<boolean>(true);
   const [facingMode, setFacingMode] = useState('environment');
   const [showSettings, setShowSettings] = useState(false);
   const [activeMenu, setActiveMenu] = useState<'stroke' | 'size' | 'zoom' | null>(null);
@@ -406,8 +407,9 @@ export default function YamaguchiCamera() {
     setCapturedSnapshot(snapshot);
     setPreviewMaskMode(maskMode);
     setPreviewStrokeWidth(strokeWidth);
+    setPreviewShowLocation(showLocation);
 
-    const composed = await composeFinal(rawDataUrl, maskMode, strokeWidth, snapshot);
+    const composed = await composeFinal(rawDataUrl, maskMode, strokeWidth, snapshot, showLocation);
     setCapturedImage(composed);
   };
 
@@ -416,6 +418,7 @@ export default function YamaguchiCamera() {
     mode: 'translucent' | 'solid',
     stroke: number,
     snap: CapturedSnapshot,
+    locationVisible: boolean,
   ): Promise<string> => {
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
@@ -490,7 +493,7 @@ export default function YamaguchiCamera() {
       <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="${mode === 'solid' ? 1 : 0.6}" mask="url(#silhouette-mask)" />
       <g transform="${snap.silhouetteTransform}">
         <path d="${snap.cityPath}" fill="none" stroke="${snap.color}" stroke-width="${stroke}" stroke-linejoin="round" stroke-linecap="round" opacity="${snap.opacity}"/>
-        ${snap.dotPos ? `<circle cx="${snap.dotPos.x}" cy="${snap.dotPos.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
+        ${locationVisible && snap.dotPosRaw ? `<circle cx="${snap.dotPosRaw.x}" cy="${snap.dotPosRaw.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
       </g>
     </svg>`;
 
@@ -523,7 +526,7 @@ export default function YamaguchiCamera() {
     if (mode === previewMaskMode) return;
     if (!capturedRaw || !capturedSnapshot) return;
     setPreviewMaskMode(mode);
-    const composed = await composeFinal(capturedRaw, mode, previewStrokeWidth, capturedSnapshot);
+    const composed = await composeFinal(capturedRaw, mode, previewStrokeWidth, capturedSnapshot, previewShowLocation);
     setCapturedImage(composed);
   };
 
@@ -531,7 +534,15 @@ export default function YamaguchiCamera() {
     if (value === previewStrokeWidth) return;
     if (!capturedRaw || !capturedSnapshot) return;
     setPreviewStrokeWidth(value);
-    const composed = await composeFinal(capturedRaw, previewMaskMode, value, capturedSnapshot);
+    const composed = await composeFinal(capturedRaw, previewMaskMode, value, capturedSnapshot, previewShowLocation);
+    setCapturedImage(composed);
+  };
+
+  const handleTogglePreviewLocation = async () => {
+    if (!capturedRaw || !capturedSnapshot) return;
+    const next = !previewShowLocation;
+    setPreviewShowLocation(next);
+    const composed = await composeFinal(capturedRaw, previewMaskMode, previewStrokeWidth, capturedSnapshot, next);
     setCapturedImage(composed);
   };
 
@@ -1025,6 +1036,36 @@ export default function YamaguchiCamera() {
                 })}
               </div>
             </div>
+            {capturedSnapshot?.dotPosRaw && (
+              <div className="w-full max-w-xs">
+                <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide text-center">現在地マーク</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => previewShowLocation || handleTogglePreviewLocation()}
+                    className={`py-2 rounded text-[12px] flex items-center justify-center gap-1.5 transition-colors ${
+                      previewShowLocation
+                        ? 'bg-white text-black font-semibold'
+                        : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                    }`}
+                    aria-pressed={previewShowLocation}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${previewShowLocation ? 'bg-red-500' : 'bg-red-500/40'}`} />
+                    表示
+                  </button>
+                  <button
+                    onClick={() => previewShowLocation && handleTogglePreviewLocation()}
+                    className={`py-2 rounded text-[12px] transition-colors ${
+                      !previewShowLocation
+                        ? 'bg-white text-black font-semibold'
+                        : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                    }`}
+                    aria-pressed={!previewShowLocation}
+                  >
+                    非表示
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex gap-3 justify-center">
               <button
                 onClick={handleRetake}
