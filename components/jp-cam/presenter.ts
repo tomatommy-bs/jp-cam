@@ -10,6 +10,7 @@ import type {
   ZoomCaps,
 } from './state';
 import type { City } from '@/lib/cities-data';
+import { projectPoint, projectionFor } from '@/lib/projection';
 
 export type Point = { x: number; y: number };
 
@@ -38,8 +39,10 @@ export function silhouetteTransform(state: State): string {
   return `translate(100,100) ${rotate} scale(${state.scale}) translate(-100,-100)`;
 }
 
-// Project user GPS into the silhouette's 0-200 SVG space.
-// Returns null when coords are missing or fall outside the current city's bbox.
+// Project user GPS into the silhouette's 0-200 SVG space using the same
+// cosLat-corrected, aspect-preserving fit that lib/projection.ts feeds
+// scripts/build-cities.mjs. Returns null when coords are missing or fall
+// outside the current city's bbox.
 export function dotPosRaw(state: State): Point | null {
   if (!state.userCoords) return null;
   const city = currentCity(state);
@@ -47,10 +50,7 @@ export function dotPosRaw(state: State): Point | null {
   const { bounds: b } = city;
   const { lat, lng } = state.userCoords;
   if (lat < b.south || lat > b.north || lng < b.west || lng > b.east) return null;
-  return {
-    x: ((lng - b.west) / (b.east - b.west)) * 200,
-    y: ((b.north - lat) / (b.north - b.south)) * 200,
-  };
+  return projectPoint(b, projectionFor(b), lng, lat);
 }
 
 // Live-preview pin: respects the showLocation toggle. The watermark drawn
