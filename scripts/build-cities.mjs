@@ -12,6 +12,9 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import polygonClipping from 'polygon-clipping';
+import { toRomaji } from 'wanakana';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'public', 'data');
@@ -22,6 +25,51 @@ const OUT_DIR = path.join(ROOT, 'public', 'data');
 // This avoids the GitHub Contents-API rate limit on rebuilds.
 const NIIYZ_DIR = process.env.NIIYZ_DIR ?? '/tmp/niiyz';
 const NIIYZ_GEOJSON = path.join(NIIYZ_DIR, 'geojson');
+
+// Slim {5-digit-code: hiragana} index distilled from code4fukui/localgovjp.
+// Used to derive romaji "readings" for the watermark / city-info overlay
+// instead of falling back to the kanji name (which would look inconsistent
+// next to the prefecture-level Hepburn romaji).
+const KANA_INDEX = JSON.parse(
+  await fs.readFile(path.join(__dirname, 'municipality-kana.json'), 'utf8'),
+);
+
+// Suffix → kana endings the citykana field uses. 市/区 are 1-mora; 町/村
+// vary so we try both common readings.
+const SUFFIX_KANA = {
+  市: ['し'],
+  区: ['く'],
+  町: ['まち', 'ちょう'],
+  村: ['むら', 'そん'],
+};
+
+// Returns the kanji + kana with the trailing 市/区/町/村 stripped so the
+// derived romaji matches the existing Yamaguchi convention (e.g.
+// 下関市/しものせきし → SHIMONOSEKI, not SHIMONOSEKISHI).
+function stripMunicipalitySuffix(name, kana) {
+  const last = name.slice(-1);
+  const candidates = SUFFIX_KANA[last];
+  if (!candidates) return { stem: name, stemKana: kana };
+  for (const s of candidates) {
+    if (kana.endsWith(s)) return { stem: name.slice(0, -1), stemKana: kana.slice(0, -s.length) };
+  }
+  return { stem: name, stemKana: kana };
+}
+
+// Derive a Hepburn-uppercase reading from the official kana, falling back
+// to the kanji name when localgovjp doesn't list this code (rare; mostly
+// the parent of merged historical municipalities).
+function readingFor(code, name) {
+  let kana = KANA_INDEX[code];
+  if (!kana) return name; // fallback — keeps the entry usable
+  // Designated-city wards come back as "札幌市 中央区"; we want just the
+  // ward portion ("中央区" → ちゅうおうく). We don't actually emit ward-
+  // level entries (they're merged into the parent), but be defensive.
+  const sp = kana.lastIndexOf(' ');
+  if (sp >= 0) kana = kana.slice(sp + 1);
+  const { stemKana } = stripMunicipalitySuffix(name, kana);
+  return toRomaji(stemKana).toUpperCase();
+}
 
 const PREFECTURES = [
   ['01', '北海道', 'HOKKAIDO'],   ['02', '青森県', 'AOMORI'],     ['03', '岩手県', 'IWATE'],
@@ -42,38 +90,46 @@ const PREFECTURES = [
   ['46', '鹿児島県', 'KAGOSHIMA'], ['47', '沖縄県', 'OKINAWA'],
 ];
 
-// Designated cities (政令指定都市): code = 5-digit parent, wardPrefix matches
-// the leading 4 digits of all child administrative-ward codes.
+// Designated cities (政令指定都市): wards have codes parent+1 .. parent+29.
+// (Largest is 大阪市 with 24 wards, smallest is 相模原市 with 3 — all fit.)
+// The +30 gap to the next designated parent in the same prefecture (e.g.
+// 横浜 14100 → 川崎 14130) means a numeric-range check unambiguously
+// identifies the parent without the prefix-mismatch bugs that ate
+// 14101-14109 (横浜) or 28110-28111 (神戸) under the old scheme.
 const DESIGNATED = [
-  ['01100', '札幌市',    'SAPPORO',   '0110'],
-  ['04100', '仙台市',    'SENDAI',    '0410'],
-  ['11100', 'さいたま市', 'SAITAMA-C', '1111'],
-  ['12100', '千葉市',    'CHIBA-C',   '1211'],
-  ['14100', '横浜市',    'YOKOHAMA',  '1411'],
-  ['14130', '川崎市',    'KAWASAKI',  '1413'],
-  ['14150', '相模原市',  'SAGAMIHARA','1415'],
-  ['15100', '新潟市',    'NIIGATA-C', '1510'],
-  ['22100', '静岡市',    'SHIZUOKA-C','2210'],
-  ['22130', '浜松市',    'HAMAMATSU', '2213'],
-  ['23100', '名古屋市',  'NAGOYA',    '2311'],
-  ['26100', '京都市',    'KYOTO-C',   '2610'],
-  ['27100', '大阪市',    'OSAKA-C',   '2711'],
-  ['27140', '堺市',      'SAKAI',     '2714'],
-  ['28100', '神戸市',    'KOBE',      '2810'],
-  ['33100', '岡山市',    'OKAYAMA-C', '3310'],
-  ['34100', '広島市',    'HIROSHIMA-C','3410'],
-  ['40100', '北九州市',  'KITAKYUSHU','4010'],
-  ['40130', '福岡市',    'FUKUOKA-C', '4013'],
-  ['43100', '熊本市',    'KUMAMOTO-C','4310'],
+  ['01100', '札幌市',    'SAPPORO'],
+  ['04100', '仙台市',    'SENDAI'],
+  ['11100', 'さいたま市', 'SAITAMA-C'],
+  ['12100', '千葉市',    'CHIBA-C'],
+  ['14100', '横浜市',    'YOKOHAMA'],
+  ['14130', '川崎市',    'KAWASAKI'],
+  ['14150', '相模原市',  'SAGAMIHARA'],
+  ['15100', '新潟市',    'NIIGATA-C'],
+  ['22100', '静岡市',    'SHIZUOKA-C'],
+  ['22130', '浜松市',    'HAMAMATSU'],
+  ['23100', '名古屋市',  'NAGOYA'],
+  ['26100', '京都市',    'KYOTO-C'],
+  ['27100', '大阪市',    'OSAKA-C'],
+  ['27140', '堺市',      'SAKAI'],
+  ['28100', '神戸市',    'KOBE'],
+  ['33100', '岡山市',    'OKAYAMA-C'],
+  ['34100', '広島市',    'HIROSHIMA-C'],
+  ['40100', '北九州市',  'KITAKYUSHU'],
+  ['40130', '福岡市',    'FUKUOKA-C'],
+  ['43100', '熊本市',    'KUMAMOTO-C'],
 ];
 
 function findDesignatedParent(code) {
-  for (const [parentCode, name, reading, prefix] of DESIGNATED) {
-    if (code.startsWith(prefix) && code !== parentCode && +code.slice(2) < 200) {
-      return { code: parentCode, name, reading };
-    }
+  // DESIGNATED is sorted; pick the LAST eligible parent (closest below
+  // the ward code) so 14151 maps to 14150 (相模原市), not to 14130 (川崎市).
+  const n = +code;
+  let best = null;
+  for (const [parentCode, name, reading] of DESIGNATED) {
+    const p = +parentCode;
+    if (p >= n) break;
+    if (n - p < 30) best = { code: parentCode, name, reading };
   }
-  return null;
+  return best;
 }
 
 // True for 23特別区 (Tokyo, codes 13101-13123): treat as standalone.
@@ -257,23 +313,36 @@ async function buildPrefecture(prefCode, prefName) {
     }
   });
 
-  // Flatten designated-city ward polygons in code-sorted order.
-  const aggregated = [...collectors.values()].map(b => ({
-    code: b.code,
-    name: b.name,
-    reading: b.reading,
-    polygons: Object.keys(b.byWard).sort().flatMap(k => b.byWard[k]),
-  }));
+  // Designated-city aggregates: union all ward polygons so adjacent
+  // boundaries collapse into a single outline (otherwise the rendered
+  // silhouette shows internal ward dividers as double-stroked lines).
+  const aggregated = [...collectors.values()].map(b => {
+    const wardCodes = Object.keys(b.byWard).sort();
+    // Each ward = array of GeoJSON Polygon (rings). polygon-clipping wants
+    // MultiPolygons (= array of Polygons). Wrap and union them all.
+    const inputs = wardCodes.map(k => b.byWard[k]); // array of MultiPolygons
+    const merged = inputs.length === 1
+      ? inputs[0]
+      : polygonClipping.union(inputs[0], ...inputs.slice(1));
+    // Result is a MultiPolygon (array of Polygons) — match the rest of the
+    // pipeline which expects an array of Polygons.
+    return {
+      code: b.code,
+      name: b.name,
+      reading: b.reading,
+      polygons: merged,
+    };
+  });
   const all = [...standalone, ...aggregated].sort((a, b) => a.code.localeCompare(b.code));
 
-  return all.map(({ code, name, reading, polygons }) => {
+  return all.map(({ code, name, polygons }) => {
     const bounds = bboxOf(polygons);
     const projected = projectPolygons(polygons, bounds);
     const path = polygonsToPath(projected, 0.5);
     return {
       id: code,
       name,
-      reading: typeof reading === 'string' ? reading : name,
+      reading: readingFor(code, name),
       path,
       bounds: {
         north: +bounds.north.toFixed(4),
