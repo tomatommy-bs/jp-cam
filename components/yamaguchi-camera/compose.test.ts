@@ -6,6 +6,7 @@ import {
   captureFilename,
   computeCaptureCrop,
   deriveZoomCaps,
+  formatExifDateTime,
 } from './compose';
 import { makeSnapshot } from './test-helpers';
 
@@ -152,18 +153,29 @@ describe('buildSilhouetteSvg', () => {
 
 describe('captureFilename', () => {
   it('uses the cityId and provided timestamp', () => {
-    expect(captureFilename('shimonoseki', 1700000000000)).toBe('yamaguchi_shimonoseki_1700000000000.png');
+    expect(captureFilename('shimonoseki', 1700000000000)).toBe('yamaguchi_shimonoseki_1700000000000.jpg');
   });
 
   it('falls back to Date.now() when no timestamp is given', () => {
     const before = Date.now();
     const name = captureFilename('hagi');
     const after = Date.now();
-    const match = name.match(/^yamaguchi_hagi_(\d+)\.png$/);
+    const match = name.match(/^yamaguchi_hagi_(\d+)\.jpg$/);
     expect(match).not.toBeNull();
     const ts = Number(match![1]);
     expect(ts).toBeGreaterThanOrEqual(before);
     expect(ts).toBeLessThanOrEqual(after);
+  });
+});
+
+describe('formatExifDateTime', () => {
+  it('formats with `:` separators and zero-padding', () => {
+    expect(formatExifDateTime(new Date(2026, 4, 9, 7, 5, 3))).toBe('2026:05:09 07:05:03');
+  });
+
+  it('uses local time, not UTC', () => {
+    const d = new Date(2024, 0, 1, 23, 59, 0);
+    expect(formatExifDateTime(d)).toBe('2024:01:01 23:59:00');
   });
 });
 
