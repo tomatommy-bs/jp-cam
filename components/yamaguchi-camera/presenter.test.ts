@@ -1,42 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CapturedSnapshot, State } from './state';
-import { CITIES, CITY_BOUNDS, init } from './state';
 import * as P from './presenter';
-
-const withCamera = (s: State, status: State['camera']): State => ({ ...s, camera: status });
-
-const snapshot = (): CapturedSnapshot => ({
-  width: 100,
-  height: 100,
-  cityId: 'shimonoseki',
-  cityName: '下関市',
-  cityReading: 'SHIMONOSEKI',
-  cityPath: 'M 0 0',
-  silhouetteTransform: '',
-  color: '#fff',
-  opacity: 1,
-  strokeWidth: 1,
-  dotPos: null,
-  dotPosRaw: null,
-  showLocationPin: true,
-});
-
-const captured = (s: State, preview: Partial<{ maskMode: 'translucent' | 'solid'; strokeWidth: number; showLocation: boolean }> = {}): State => ({
-  ...s,
-  capture: {
-    kind: 'captured',
-    raw: 'raw',
-    composed: 'composed',
-    snapshot: snapshot(),
-    preview: {
-      maskMode: 'translucent',
-      strokeWidth: 1.65,
-      showLocation: true,
-      ...preview,
-    },
-  },
-});
+import { CITIES, CITY_BOUNDS, init } from './state';
+import { withCamera, withCaptured } from './test-helpers';
 
 describe('presenter — currentCity & silhouetteTransform', () => {
   it('currentCity indexes into CITIES', () => {
@@ -137,7 +103,7 @@ describe('presenter — capture derivations', () => {
   });
 
   it('capturedImage / capturedSnapshot expose values when captured', () => {
-    const s = captured(init());
+    const s = withCaptured(init());
     expect(P.capturedImage(s)).toBe('composed');
     expect(P.capturedSnapshot(s)?.cityId).toBe('shimonoseki');
   });
@@ -149,7 +115,7 @@ describe('presenter — capture derivations', () => {
   });
 
   it('preview-* read from capture.preview when captured', () => {
-    const s = captured(init(), { maskMode: 'solid', strokeWidth: 0.8, showLocation: false });
+    const s = withCaptured(init(), { maskMode: 'solid', strokeWidth: 0.8, showLocation: false });
     expect(P.previewMaskMode(s)).toBe('solid');
     expect(P.previewStrokeWidth(s)).toBe(0.8);
     expect(P.previewShowLocation(s)).toBe(false);

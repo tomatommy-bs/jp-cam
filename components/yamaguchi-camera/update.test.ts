@@ -1,31 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CapturedSnapshot, State } from './state';
+import type { State } from './state';
 import { CITIES, SCALE_MAX, SCALE_MIN, init } from './state';
+import { expectCaptured, makeSnapshot } from './test-helpers';
 import { update } from './update';
-
-const baseSnapshot = (): CapturedSnapshot => ({
-  width: 800,
-  height: 600,
-  cityId: 'shimonoseki',
-  cityName: '下関市',
-  cityReading: 'SHIMONOSEKI',
-  cityPath: 'M 0 0',
-  silhouetteTransform: 'translate(100,100) scale(1) translate(-100,-100)',
-  color: '#ffffff',
-  opacity: 0.9,
-  strokeWidth: 1.65,
-  dotPos: null,
-  dotPosRaw: null,
-  showLocationPin: true,
-});
 
 const captured = (s: State): State =>
   update(s, {
     type: 'captureCompleted',
     raw: 'data:raw',
     composed: 'data:composed',
-    snapshot: baseSnapshot(),
+    snapshot: makeSnapshot(),
   });
 
 describe('update — settingsHydrated', () => {
@@ -64,12 +49,12 @@ describe('update — settingsHydrated', () => {
       type: 'settingsHydrated',
       patch: {
         cityIndex: 9999,
-        // PersistedSettings.facingMode is typed as `string`; the runtime
-        // guard rejects anything other than 'environment' | 'user'.
+        // PersistedSettings.facingMode is typed `string`; runtime guard rejects
+        // anything other than 'environment' | 'user', so no @ts-expect-error here.
         facingMode: 'sideways',
         // @ts-expect-error — runtime guard against bogus persisted data
         maskMode: 'banana',
-        // @ts-expect-error
+        // @ts-expect-error — runtime guard against bogus persisted data
         showLocation: 'yes',
       },
     });
@@ -221,35 +206,40 @@ describe('update — capture flow', () => {
       strokeWidth: 0.8,
       showLocation: false,
     };
-    const after = captured(before);
-    expect(after.capture.kind).toBe('captured');
-    if (after.capture.kind !== 'captured') throw new Error('unreachable');
-    expect(after.capture.preview).toEqual({
+    const after = expectCaptured(captured(before));
+    expect(after.preview).toEqual({
       maskMode: 'solid',
       strokeWidth: 0.8,
       showLocation: false,
     });
-    expect(after.capture.raw).toBe('data:raw');
-    expect(after.capture.composed).toBe('data:composed');
+    expect(after.raw).toBe('data:raw');
+    expect(after.composed).toBe('data:composed');
   });
 
   it('previewMaskSet / previewStrokeSet / previewLocationToggled update only the preview', () => {
     const c = captured(init());
-    const masked = update(c, { type: 'previewMaskSet', mode: 'solid', composed: 'data:m' });
-    if (masked.capture.kind !== 'captured') throw new Error('unreachable');
-    expect(masked.capture.preview.maskMode).toBe('solid');
-    expect(masked.capture.composed).toBe('data:m');
+    const masked = expectCaptured(
+      update(c, { type: 'previewMaskSet', mode: 'solid', composed: 'data:m' }),
+    );
+    expect(masked.preview.maskMode).toBe('solid');
+    expect(masked.composed).toBe('data:m');
 
-    const stroked = update(masked, { type: 'previewStrokeSet', value: 0.8, composed: 'data:s' });
-    if (stroked.capture.kind !== 'captured') throw new Error('unreachable');
-    expect(stroked.capture.preview.strokeWidth).toBe(0.8);
-    expect(stroked.capture.composed).toBe('data:s');
+    const stroked = expectCaptured(
+      update({ ...c, capture: masked }, {
+        type: 'previewStrokeSet', value: 0.8, composed: 'data:s',
+      }),
+    );
+    expect(stroked.preview.strokeWidth).toBe(0.8);
+    expect(stroked.composed).toBe('data:s');
 
-    const before = stroked.capture.preview.showLocation;
-    const toggled = update(stroked, { type: 'previewLocationToggled', composed: 'data:l' });
-    if (toggled.capture.kind !== 'captured') throw new Error('unreachable');
-    expect(toggled.capture.preview.showLocation).toBe(!before);
-    expect(toggled.capture.composed).toBe('data:l');
+    const beforeLoc = stroked.preview.showLocation;
+    const toggled = expectCaptured(
+      update({ ...c, capture: stroked }, {
+        type: 'previewLocationToggled', composed: 'data:l',
+      }),
+    );
+    expect(toggled.preview.showLocation).toBe(!beforeLoc);
+    expect(toggled.composed).toBe('data:l');
   });
 
   it('preview-* msgs are no-ops when capture is idle', () => {
