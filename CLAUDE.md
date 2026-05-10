@@ -4,12 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-This project uses **pnpm** (see `packageManager` in package.json). There is no test suite.
+This project uses **pnpm** (see `packageManager` in package.json).
 
 - `pnpm dev` — start Next.js dev server
 - `pnpm build` — production build
 - `pnpm start` — run production server
 - `pnpm lint` — `eslint .`
+- `pnpm test` — run Vitest once (CI mode); `pnpm test:watch` for watch mode
+
+Tests cover the pure modules in `components/yamaguchi-camera/` (`update.ts`, `presenter.ts`). The view component (`yamaguchi-camera.tsx`) is not unit-tested — all I/O is funneled through `dispatch`, so reducer/derivation tests are sufficient.
 
 `next.config.mjs` sets `typescript.ignoreBuildErrors: true`, so `pnpm build` will not catch type errors. To type-check, run `pnpm exec tsc --noEmit` directly.
 
