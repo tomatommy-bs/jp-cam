@@ -25,6 +25,8 @@ export type CapturedSnapshot = {
   dotPos: { x: number; y: number } | null;
   dotPosRaw: { x: number; y: number } | null;
   showLocationPin: boolean;
+  userCoords: Coords | null;
+  capturedAt: number;
 };
 
 export type CameraStatus =

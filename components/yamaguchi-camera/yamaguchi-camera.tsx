@@ -13,6 +13,8 @@ import { CITIES } from '@/lib/city-database';
 import { update } from './update';
 import * as P from './presenter';
 import {
+  attachExif,
+  buildExifBinary,
   buildSilhouetteSvg,
   cameraErrorMessage,
   captureFilename,
@@ -212,7 +214,7 @@ export default function YamaguchiCamera() {
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
     }
 
-    const rawDataUrl = canvas.toDataURL('image/png');
+    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.92);
     const snapshot: CapturedSnapshot = {
       width: w,
       height: h,
@@ -228,6 +230,8 @@ export default function YamaguchiCamera() {
       dotPos,
       dotPosRaw,
       showLocationPin,
+      userCoords: showLocation ? userCoords : null,
+      capturedAt: Date.now(),
     };
 
     const composed = await composeFinal(rawDataUrl, maskMode, strokeWidth, snapshot, showLocation);
@@ -330,7 +334,9 @@ export default function YamaguchiCamera() {
 
         const finalize = () => {
           URL.revokeObjectURL(url);
-          resolve(canvas.toDataURL('image/png'));
+          const jpeg = canvas.toDataURL('image/jpeg', 0.92);
+          const exif = buildExifBinary({ userCoords: snap.userCoords, capturedAt: snap.capturedAt });
+          resolve(attachExif(jpeg, exif));
         };
 
         svgImg.onload = () => {

@@ -18,6 +18,8 @@ export function makeSnapshot(overrides: Partial<CapturedSnapshot> = {}): Capture
     dotPos: null,
     dotPosRaw: null,
     showLocationPin: i.showLocationPin,
+    userCoords: null,
+    capturedAt: 0,
     ...overrides,
   };
 }

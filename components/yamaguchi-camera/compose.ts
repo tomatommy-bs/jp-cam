@@ -2,7 +2,9 @@
 // No DOM, no React, no I/O — split out so they can be unit tested
 // without a browser environment.
 
-import type { CapturedSnapshot, MaskMode, ZoomCaps } from './state';
+import piexif from 'piexifjs';
+
+import type { CapturedSnapshot, Coords, MaskMode, ZoomCaps } from './state';
 
 export type CaptureCropInput = {
   videoWidth: number;
@@ -85,7 +87,48 @@ export function buildSilhouetteSvg({ snapshot, maskMode, strokeWidth, locationVi
 }
 
 export function captureFilename(cityId: string, timestamp: number = Date.now()): string {
-  return `yamaguchi_${cityId}_${timestamp}.png`;
+  return `yamaguchi_${cityId}_${timestamp}.jpg`;
+}
+
+// EXIF DateTime format is `YYYY:MM:DD HH:MM:SS` in local time. Note that
+// the date separator is `:` (not `-`) — this is the EXIF spec, not a typo.
+export function formatExifDateTime(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}:${pad(d.getMonth() + 1)}:${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+export type ExifInput = {
+  userCoords: Coords | null;
+  capturedAt: number;
+};
+
+export function buildExifBinary({ userCoords, capturedAt }: ExifInput): string {
+  const dt = formatExifDateTime(new Date(capturedAt));
+  const exifObj: piexif.ExifDict = {
+    '0th': {
+      [piexif.ImageIFD.DateTime]: dt,
+      [piexif.ImageIFD.Software]: 'Yamaguchi 13',
+    },
+    Exif: {
+      [piexif.ExifIFD.DateTimeOriginal]: dt,
+      [piexif.ExifIFD.DateTimeDigitized]: dt,
+    },
+    GPS: {},
+  };
+
+  if (userCoords) {
+    const { lat, lng } = userCoords;
+    exifObj.GPS![piexif.GPSIFD.GPSLatitude] = piexif.GPSHelper.degToDmsRational(Math.abs(lat));
+    exifObj.GPS![piexif.GPSIFD.GPSLatitudeRef] = lat >= 0 ? 'N' : 'S';
+    exifObj.GPS![piexif.GPSIFD.GPSLongitude] = piexif.GPSHelper.degToDmsRational(Math.abs(lng));
+    exifObj.GPS![piexif.GPSIFD.GPSLongitudeRef] = lng >= 0 ? 'E' : 'W';
+  }
+
+  return piexif.dump(exifObj);
+}
+
+export function attachExif(jpegDataUrl: string, exifBinary: string): string {
+  return piexif.insert(exifBinary, jpegDataUrl);
 }
 
 export function cameraErrorMessage(error: unknown): string {
