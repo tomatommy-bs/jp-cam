@@ -8,10 +8,16 @@ import type {
   CapturedSnapshot,
   MaskMode,
   PersistedSettings,
-  ZoomCaps,
 } from './state';
 import { update } from './update';
 import * as P from './presenter';
+import {
+  buildSilhouetteSvg,
+  cameraErrorMessage,
+  captureFilename,
+  computeCaptureCrop,
+  deriveZoomCaps,
+} from './compose';
 
 // View-side constants — UI choices, not domain data.
 const COLORS = ['#ffffff', '#fbbf24', '#fb7185', '#60a5fa', '#34d399', '#a78bfa', '#000000'];
@@ -150,23 +156,12 @@ export default function YamaguchiCamera() {
         if (videoRef.current) videoRef.current.srcObject = s;
         const track = s.getVideoTracks()[0] || null;
         videoTrackRef.current = track;
-        let caps: ZoomCaps | null = null;
         const trackCaps = (track && typeof track.getCapabilities === 'function')
           ? (track.getCapabilities() as MediaTrackCapabilities & { zoom?: { min?: number; max?: number; step?: number } })
           : null;
-        if (trackCaps && trackCaps.zoom && typeof trackCaps.zoom.max === 'number' && trackCaps.zoom.max > (trackCaps.zoom.min ?? 1)) {
-          caps = {
-            min: trackCaps.zoom.min ?? 1,
-            max: trackCaps.zoom.max,
-            step: trackCaps.zoom.step && trackCaps.zoom.step > 0 ? trackCaps.zoom.step : 0.1,
-          };
-        }
-        dispatch({ type: 'cameraReady', zoomCaps: caps });
-      } catch (e: any) {
-        let msg = e?.message || 'カメラを起動できませんでした';
-        if (e?.name === 'NotAllowedError') msg = 'カメラへのアクセスが拒否されました';
-        if (e?.name === 'NotFoundError') msg = 'カメラが見つかりませんでした';
-        if (!cancelled) dispatch({ type: 'cameraFailed', message: msg });
+        dispatch({ type: 'cameraReady', zoomCaps: deriveZoomCaps(trackCaps?.zoom) });
+      } catch (e: unknown) {
+        if (!cancelled) dispatch({ type: 'cameraFailed', message: cameraErrorMessage(e) });
       }
     }
 
@@ -191,41 +186,20 @@ export default function YamaguchiCamera() {
     const canvas = canvasRef.current;
     if (!video || !canvas || !video.videoWidth) return;
 
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-
-    // Match the preview's object-cover crop so the captured image and
-    // SVG silhouette align with what the user sees on screen. Without
-    // this, a portrait container + landscape camera (or vice-versa)
-    // makes the silhouette appear at a different size in the photo.
     const rect = video.getBoundingClientRect();
-    const containerW = rect.width || vw;
-    const containerH = rect.height || vh;
-    const containerAspect = containerW / containerH;
-    const videoAspect = vw / vh;
-
-    let baseCropW: number;
-    let baseCropH: number;
-    if (videoAspect > containerAspect) {
-      baseCropH = vh;
-      baseCropW = vh * containerAspect;
-    } else {
-      baseCropW = vw;
-      baseCropH = vw / containerAspect;
-    }
-
-    const w = Math.round(baseCropW);
-    const h = Math.round(baseCropH);
+    const crop = computeCaptureCrop({
+      videoWidth: video.videoWidth,
+      videoHeight: video.videoHeight,
+      containerWidth: rect.width || video.videoWidth,
+      containerHeight: rect.height || video.videoHeight,
+      zoom,
+      isDigitalZoom,
+    });
+    const { destWidth: w, destHeight: h, srcX: sx, srcY: sy, srcWidth: sw, srcHeight: sh } = crop;
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    const useCrop = isDigitalZoom && zoom > 1;
-    const sw = useCrop ? baseCropW / zoom : baseCropW;
-    const sh = useCrop ? baseCropH / zoom : baseCropH;
-    const sx = (vw - sw) / 2;
-    const sy = (vh - sh) / 2;
 
     if (facingMode === 'user') {
       ctx.save();
@@ -326,21 +300,12 @@ export default function YamaguchiCamera() {
       rawImg.onload = () => {
         ctx.drawImage(rawImg, 0, 0, snap.width, snap.height);
 
-        const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="${snap.width}" height="${snap.height}" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <mask id="silhouette-mask">
-          <rect x="-500" y="-500" width="1200" height="1200" fill="white" />
-          <g transform="${snap.silhouetteTransform}">
-            <path d="${snap.cityPath}" fill="black" />
-          </g>
-        </mask>
-      </defs>
-      <rect x="-500" y="-500" width="1200" height="1200" fill="black" fill-opacity="${mode === 'solid' ? 1 : 0.6}" mask="url(#silhouette-mask)" />
-      <g transform="${snap.silhouetteTransform}">
-        <path d="${snap.cityPath}" fill="none" stroke="${snap.color}" stroke-width="${stroke}" stroke-linejoin="round" stroke-linecap="round" opacity="${snap.opacity}"/>
-        ${locationVisible && snap.dotPosRaw ? `<circle cx="${snap.dotPosRaw.x}" cy="${snap.dotPosRaw.y}" r="3.5" fill="#ef4444" stroke="white" stroke-width="1"/>` : ''}
-      </g>
-    </svg>`;
+        const svgString = buildSilhouetteSvg({
+          snapshot: snap,
+          maskMode: mode,
+          strokeWidth: stroke,
+          locationVisible,
+        });
 
         const svgImg = new Image();
         const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -397,7 +362,7 @@ export default function YamaguchiCamera() {
   const downloadDataUrl = (dataUrl: string, cityId: string) => {
     const link = document.createElement('a');
     link.href = dataUrl;
-    link.download = `yamaguchi_${cityId}_${Date.now()}.png`;
+    link.download = captureFilename(cityId);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
