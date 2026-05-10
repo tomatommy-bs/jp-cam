@@ -1,11 +1,17 @@
 // Discriminated-union of every transition the view can request.
 // Pure data — no behavior here. See ./update for transitions.
 
+import type { City } from '@/lib/cities-data';
+
 import type { CapturedSnapshot, Coords, MaskMode, Menu, PersistedSettings, ZoomCaps } from './state';
 
 export type Msg =
   // Persistence
   | { type: 'settingsHydrated'; patch: Partial<PersistedSettings> }
+  // Prefecture / cities catalog
+  | { type: 'prefectureSelected'; prefCode: string }
+  | { type: 'citiesLoaded'; prefCode: string; cities: City[] }
+  | { type: 'citiesFailed'; prefCode: string; message: string }
   // Camera
   | { type: 'cameraReady'; zoomCaps: ZoomCaps | null }
   | { type: 'cameraFailed'; message: string }

@@ -2,9 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import type { State } from './state';
 import { SCALE_MAX, SCALE_MIN, init } from './state';
-import { CITIES } from '@/lib/city-database';
-import { expectCaptured, makeSnapshot } from './test-helpers';
+import { expectCaptured, makeCity, makeSnapshot, withCities } from './test-helpers';
 import { update } from './update';
+
+const sampleCities = [
+  makeCity({ id: '35201', name: '下関市' }),
+  makeCity({ id: '35202', name: '宇部市' }),
+  makeCity({ id: '35203', name: '山口市' }),
+];
+
+const ready = (s: State = init()) => withCities(s, sampleCities);
 
 const captured = (s: State): State =>
   update(s, {
@@ -49,7 +56,6 @@ describe('update — settingsHydrated', () => {
     const s = update(before, {
       type: 'settingsHydrated',
       patch: {
-        cityIndex: 9999,
         // PersistedSettings.facingMode is typed `string`; runtime guard rejects
         // anything other than 'environment' | 'user', so no @ts-expect-error here.
         facingMode: 'sideways',
@@ -59,7 +65,6 @@ describe('update — settingsHydrated', () => {
         showLocation: 'yes',
       },
     });
-    expect(s.cityIndex).toBe(before.cityIndex);
     expect(s.facingMode).toBe(before.facingMode);
     expect(s.maskMode).toBe(before.maskMode);
     expect(s.showLocation).toBe(before.showLocation);
@@ -69,6 +74,47 @@ describe('update — settingsHydrated', () => {
   it('treats negative cityIndex as invalid', () => {
     const s = update(init(), { type: 'settingsHydrated', patch: { cityIndex: -1 } });
     expect(s.cityIndex).toBe(0);
+  });
+
+  it('rejects cityIndex out of range when cities are loaded', () => {
+    const before = ready({ ...init(), cityIndex: 1 });
+    const s = update(before, { type: 'settingsHydrated', patch: { cityIndex: 99 } });
+    expect(s.cityIndex).toBe(1);
+  });
+});
+
+describe('update — prefecture / cities lifecycle', () => {
+  it('prefectureSelected switches prefCode and resets cities to loading', () => {
+    const before = ready({ ...init(), cityIndex: 2 });
+    const after = update(before, { type: 'prefectureSelected', prefCode: '13' });
+    expect(after.prefCode).toBe('13');
+    expect(after.cities.kind).toBe('loading');
+    expect(after.cityIndex).toBe(0);
+  });
+
+  it('prefectureSelected is a no-op when picking the already-loaded prefecture', () => {
+    const before = ready({ ...init(), prefCode: '35' });
+    expect(update(before, { type: 'prefectureSelected', prefCode: '35' })).toBe(before);
+  });
+
+  it('citiesLoaded ignores stale prefCode', () => {
+    const s = init();
+    const stale = update(s, { type: 'citiesLoaded', prefCode: '99', cities: sampleCities });
+    expect(stale).toBe(s);
+  });
+
+  it('citiesLoaded clamps cityIndex into range', () => {
+    const before = { ...init(), cityIndex: 9 };
+    const after = update(before, { type: 'citiesLoaded', prefCode: before.prefCode, cities: sampleCities });
+    if (after.cities.kind !== 'ready') throw new Error('expected ready');
+    expect(after.cities.cities).toBe(sampleCities);
+    expect(after.cityIndex).toBe(0);
+  });
+
+  it('citiesFailed records the message', () => {
+    const before = init();
+    const after = update(before, { type: 'citiesFailed', prefCode: before.prefCode, message: 'down' });
+    expect(after.cities).toEqual({ kind: 'error', message: 'down' });
   });
 });
 
@@ -129,16 +175,27 @@ describe('update — zoom', () => {
 });
 
 describe('update — silhouette settings', () => {
-  it('citySelected sets cityIndex', () => {
-    expect(update(init(), { type: 'citySelected', index: 4 }).cityIndex).toBe(4);
+  it('citySelected sets cityIndex when valid', () => {
+    expect(update(ready(), { type: 'citySelected', index: 2 }).cityIndex).toBe(2);
   });
 
-  it('cityStepped wraps around both ends', () => {
-    const s0 = init();
-    const last = update(s0, { type: 'cityStepped', delta: -1 });
-    expect(last.cityIndex).toBe(CITIES.length - 1);
+  it('citySelected is a no-op when out of range or cities not ready', () => {
+    expect(update(init(), { type: 'citySelected', index: 0 }).cityIndex).toBe(0);
+    const r = ready();
+    expect(update(r, { type: 'citySelected', index: 99 })).toBe(r);
+  });
+
+  it('cityStepped wraps around both ends using the loaded list', () => {
+    const r = ready();
+    const last = update(r, { type: 'cityStepped', delta: -1 });
+    expect(last.cityIndex).toBe(sampleCities.length - 1);
     const first = update(last, { type: 'cityStepped', delta: 1 });
     expect(first.cityIndex).toBe(0);
+  });
+
+  it('cityStepped is a no-op while cities are still loading', () => {
+    const s = init();
+    expect(update(s, { type: 'cityStepped', delta: 1 })).toBe(s);
   });
 
   it('colorSet, opacitySet, maskModeSet, silhouetteRotateToggled', () => {

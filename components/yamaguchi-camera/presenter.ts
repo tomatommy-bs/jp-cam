@@ -9,13 +9,25 @@ import type {
   State,
   ZoomCaps,
 } from './state';
-import type { City } from '@/lib/city-database';
-import { CITIES, CITY_BOUNDS } from '@/lib/city-database';
+import type { City } from '@/lib/cities-data';
 
 export type Point = { x: number; y: number };
 
-export function currentCity(state: State): City {
-  return CITIES[state.cityIndex];
+export function cities(state: State): City[] {
+  return state.cities.kind === 'ready' ? state.cities.cities : [];
+}
+
+export function currentCity(state: State): City | null {
+  if (state.cities.kind !== 'ready') return null;
+  return state.cities.cities[state.cityIndex] ?? null;
+}
+
+export function citiesLoading(state: State): boolean {
+  return state.cities.kind === 'loading';
+}
+
+export function citiesError(state: State): string | null {
+  return state.cities.kind === 'error' ? state.cities.message : null;
 }
 
 // SVG transform applied to both the live silhouette and the captured PNG.
@@ -30,8 +42,9 @@ export function silhouetteTransform(state: State): string {
 // Returns null when coords are missing or fall outside the current city's bbox.
 export function dotPosRaw(state: State): Point | null {
   if (!state.userCoords) return null;
-  const b = CITY_BOUNDS[currentCity(state).id];
-  if (!b) return null;
+  const city = currentCity(state);
+  if (!city) return null;
+  const { bounds: b } = city;
   const { lat, lng } = state.userCoords;
   if (lat < b.south || lat > b.north || lng < b.west || lng > b.east) return null;
   return {

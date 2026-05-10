@@ -9,7 +9,7 @@ import type {
   MaskMode,
   PersistedSettings,
 } from './state';
-import { CITIES } from '@/lib/city-database';
+import { loadCities } from '@/lib/cities-data';
 import { update } from './update';
 import * as P from './presenter';
 import {
@@ -79,7 +79,10 @@ export default function YamaguchiCamera() {
   const previewMaskMode = P.previewMaskMode(state);
   const previewStrokeWidth = P.previewStrokeWidth(state);
   const previewShowLocation = P.previewShowLocation(state);
+  const cities = P.cities(state);
   const currentCity = P.currentCity(state);
+  const citiesLoading = P.citiesLoading(state);
+  const citiesError = P.citiesError(state);
   const silhouetteTransform = P.silhouetteTransform(state);
 
   // Hydrate persisted settings on mount; always dispatch (even on miss/error)
@@ -112,6 +115,20 @@ export default function YamaguchiCamera() {
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(s));
     } catch {}
   }, [state.settingsLoaded, cityIndex, color, opacity, scale, strokeWidth, facingMode, maskMode, showLocation, showLocationPin, silhouetteRotated]);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadCities(state.prefCode)
+      .then(list => {
+        if (cancelled) return;
+        dispatch({ type: 'citiesLoaded', prefCode: state.prefCode, cities: list });
+      })
+      .catch(err => {
+        if (cancelled) return;
+        dispatch({ type: 'citiesFailed', prefCode: state.prefCode, message: err?.message || '都市データの読み込みに失敗しました' });
+      });
+    return () => { cancelled = true; };
+  }, [state.prefCode]);
 
   useEffect(() => {
     if (!('geolocation' in navigator)) {
@@ -188,6 +205,7 @@ export default function YamaguchiCamera() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !video.videoWidth) return;
+    if (!currentCity) return;
 
     const rect = video.getBoundingClientRect();
     const crop = computeCaptureCrop({
@@ -393,7 +411,7 @@ export default function YamaguchiCamera() {
 
   const handleDownload = () => {
     if (!capturedImage) return;
-    const cityId = capturedSnapshot?.cityId ?? currentCity.id;
+    const cityId = capturedSnapshot?.cityId ?? currentCity?.id ?? 'unknown';
     downloadDataUrl(capturedImage, cityId);
   };
 
@@ -452,59 +470,63 @@ export default function YamaguchiCamera() {
                 transition: 'transform 80ms linear',
               }}
             />
-            <svg 
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              viewBox="0 0 200 200" 
-              preserveAspectRatio="xMidYMid slice"
-            >
-              <defs>
-                <mask id="silhouette-mask">
-                  <rect x="-500" y="-500" width="1200" height="1200" fill="white" />
-                  <g transform={silhouetteTransform}>
-                    <path d={currentCity.path} fill="black" />
-                  </g>
-                </mask>
-              </defs>
-              <rect
-                x="-500" y="-500" width="1200" height="1200"
-                fill="black"
-                fillOpacity={maskMode === 'solid' ? 1 : 0.6}
-                mask="url(#silhouette-mask)"
-              />
-              <g transform={silhouetteTransform}>
-                <path
-                  d={currentCity.path}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth={strokeWidth}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  opacity={opacity}
-                  style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }}
+            {currentCity && (
+              <svg
+                className="absolute inset-0 w-full h-full pointer-events-none"
+                viewBox="0 0 200 200"
+                preserveAspectRatio="xMidYMid slice"
+              >
+                <defs>
+                  <mask id="silhouette-mask">
+                    <rect x="-500" y="-500" width="1200" height="1200" fill="white" />
+                    <g transform={silhouetteTransform}>
+                      <path d={currentCity.path} fill="black" />
+                    </g>
+                  </mask>
+                </defs>
+                <rect
+                  x="-500" y="-500" width="1200" height="1200"
+                  fill="black"
+                  fillOpacity={maskMode === 'solid' ? 1 : 0.6}
+                  mask="url(#silhouette-mask)"
                 />
-                {dotPos && (
-                  <circle
-                    cx={dotPos.x}
-                    cy={dotPos.y}
-                    r={3.5}
-                    fill="#ef4444"
-                    stroke="white"
-                    strokeWidth={1}
-                    style={{ filter: 'drop-shadow(0 0 3px rgba(239,68,68,0.8))' }}
+                <g transform={silhouetteTransform}>
+                  <path
+                    d={currentCity.path}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={strokeWidth}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    opacity={opacity}
+                    style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }}
                   />
-                )}
-              </g>
-            </svg>
+                  {dotPos && (
+                    <circle
+                      cx={dotPos.x}
+                      cy={dotPos.y}
+                      r={3.5}
+                      fill="#ef4444"
+                      stroke="white"
+                      strokeWidth={1}
+                      style={{ filter: 'drop-shadow(0 0 3px rgba(239,68,68,0.8))' }}
+                    />
+                  )}
+                </g>
+              </svg>
+            )}
             
             {/* City info overlay */}
             <div className="absolute top-3 left-3 right-3 flex justify-between items-start pointer-events-none">
               <div className="bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-md">
-                <div className="text-base font-bold leading-tight">{currentCity.name}</div>
-                <div className="text-[9px] text-gray-300 tracking-[0.15em] leading-tight">{currentCity.reading}</div>
+                <div className="text-base font-bold leading-tight">{currentCity?.name ?? '読込中…'}</div>
+                <div className="text-[9px] text-gray-300 tracking-[0.15em] leading-tight">{currentCity?.reading ?? ''}</div>
               </div>
               <div className="flex flex-col items-end gap-1">
                 <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-[10px] tabular-nums">
-                  {String(cityIndex + 1).padStart(2, '0')} / {CITIES.length}
+                  {cities.length > 0
+                    ? `${String(cityIndex + 1).padStart(2, '0')} / ${cities.length}`
+                    : '— / —'}
                 </div>
                 {zoom > zoomMin + 0.001 && (
                   <div className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-[10px] tabular-nums font-semibold">
@@ -625,13 +647,19 @@ export default function YamaguchiCamera() {
         </button>
         <div className="flex-1 overflow-x-auto flex gap-1.5 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <style>{`div::-webkit-scrollbar { display: none; }`}</style>
-          {CITIES.map((city, i) => (
+          {citiesLoading && (
+            <div className="px-3 py-1.5 text-[11px] text-gray-400">都市データ読込中…</div>
+          )}
+          {citiesError && (
+            <div className="px-3 py-1.5 text-[11px] text-red-300">読込失敗: {citiesError}</div>
+          )}
+          {cities.map((city, i) => (
             <button
               key={city.id}
               onClick={() => dispatch({ type: 'citySelected', index: i })}
               className={`px-3 py-1.5 rounded-full text-[11px] whitespace-nowrap flex-shrink-0 transition-all ${
-                i === cityIndex 
-                  ? 'bg-white text-black font-semibold' 
+                i === cityIndex
+                  ? 'bg-white text-black font-semibold'
                   : 'bg-white/10 text-gray-200 hover:bg-white/20'
               }`}
             >
@@ -651,7 +679,7 @@ export default function YamaguchiCamera() {
       <div className="bg-black px-4 pt-3 pb-5 relative flex justify-center items-center">
         <button
           onClick={handleCapture}
-          disabled={!!error || loading}
+          disabled={!!error || loading || !currentCity}
           className="w-16 h-16 rounded-full bg-transparent border-[3px] border-white hover:scale-105 active:scale-95 transition-transform disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center group"
           aria-label="撮影"
         >

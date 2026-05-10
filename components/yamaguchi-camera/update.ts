@@ -4,7 +4,6 @@
 
 import type { State } from './state';
 import { SCALE_MAX, SCALE_MIN } from './state';
-import { CITIES } from '@/lib/city-database';
 import type { Msg } from './message';
 
 function clampZoom(state: State, zoom: number): number {
@@ -14,14 +13,19 @@ function clampZoom(state: State, zoom: number): number {
   return Math.min(max, Math.max(min, zoom));
 }
 
+function citiesLength(state: State): number {
+  return state.cities.kind === 'ready' ? state.cities.cities.length : 0;
+}
+
 export function update(state: State, msg: Msg): State {
   switch (msg.type) {
     case 'settingsHydrated': {
       const p = msg.patch;
+      const len = citiesLength(state);
       return {
         ...state,
         cityIndex:
-          typeof p.cityIndex === 'number' && p.cityIndex >= 0 && p.cityIndex < CITIES.length
+          typeof p.cityIndex === 'number' && p.cityIndex >= 0 && (len === 0 || p.cityIndex < len)
             ? p.cityIndex
             : state.cityIndex,
         color: typeof p.color === 'string' ? p.color : state.color,
@@ -39,6 +43,27 @@ export function update(state: State, msg: Msg): State {
         settingsLoaded: true,
       };
     }
+    case 'prefectureSelected':
+      if (msg.prefCode === state.prefCode && state.cities.kind === 'ready') return state;
+      return {
+        ...state,
+        prefCode: msg.prefCode,
+        cities: { kind: 'loading' },
+        cityIndex: 0,
+      };
+    case 'citiesLoaded':
+      // Race-condition guard: ignore loads for a stale prefCode.
+      if (msg.prefCode !== state.prefCode) return state;
+      return {
+        ...state,
+        cities: { kind: 'ready', cities: msg.cities },
+        // Keep cityIndex if it still points at a valid entry (e.g., user
+        // already navigated). Otherwise clamp to 0.
+        cityIndex: state.cityIndex < msg.cities.length ? state.cityIndex : 0,
+      };
+    case 'citiesFailed':
+      if (msg.prefCode !== state.prefCode) return state;
+      return { ...state, cities: { kind: 'error', message: msg.message } };
     case 'cameraReady':
       return {
         ...state,
@@ -56,10 +81,16 @@ export function update(state: State, msg: Msg): State {
       };
     case 'zoomNudged':
       return { ...state, zoom: +clampZoom(state, state.zoom + msg.delta).toFixed(2) };
-    case 'citySelected':
+    case 'citySelected': {
+      const len = citiesLength(state);
+      if (len === 0 || msg.index < 0 || msg.index >= len) return state;
       return { ...state, cityIndex: msg.index };
-    case 'cityStepped':
-      return { ...state, cityIndex: (state.cityIndex + msg.delta + CITIES.length) % CITIES.length };
+    }
+    case 'cityStepped': {
+      const len = citiesLength(state);
+      if (len === 0) return state;
+      return { ...state, cityIndex: (state.cityIndex + msg.delta + len) % len };
+    }
     case 'colorSet':
       return { ...state, color: msg.color };
     case 'opacitySet':

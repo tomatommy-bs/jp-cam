@@ -2,66 +2,88 @@ import { describe, expect, it } from 'vitest';
 
 import * as P from './presenter';
 import { init } from './state';
-import { CITIES, CITY_BOUNDS } from '@/lib/city-database';
-import { withCamera, withCaptured } from './test-helpers';
+import { makeCity, withCamera, withCaptured, withCities } from './test-helpers';
 
-describe('presenter — currentCity & silhouetteTransform', () => {
-  it('currentCity indexes into CITIES', () => {
-    expect(P.currentCity({ ...init(), cityIndex: 2 })).toBe(CITIES[2]);
+const SHIMONOSEKI_BOUNDS = { north: 34.30, south: 33.95, east: 131.10, west: 130.85 };
+const HAGI_BOUNDS = { north: 34.65, south: 34.20, east: 131.80, west: 131.25 };
+
+const sampleCities = [
+  makeCity({ id: 'shimonoseki', name: '下関市', bounds: SHIMONOSEKI_BOUNDS }),
+  makeCity({ id: 'hagi', name: '萩市', bounds: HAGI_BOUNDS }),
+];
+
+describe('presenter — currentCity & cities lifecycle', () => {
+  it('currentCity returns null while cities are loading', () => {
+    expect(P.currentCity(init())).toBeNull();
+    expect(P.citiesLoading(init())).toBe(true);
   });
 
-  it('silhouetteTransform without rotation', () => {
+  it('currentCity indexes into the loaded list', () => {
+    const s = withCities({ ...init(), cityIndex: 1 }, sampleCities);
+    expect(P.currentCity(s)?.id).toBe('hagi');
+  });
+
+  it('citiesError surfaces error messages', () => {
+    const s = { ...init(), cities: { kind: 'error' as const, message: 'boom' } };
+    expect(P.citiesError(s)).toBe('boom');
+  });
+});
+
+describe('presenter — silhouetteTransform', () => {
+  it('without rotation', () => {
     expect(P.silhouetteTransform({ ...init(), scale: 1.25, silhouetteRotated: false }))
       .toBe('translate(100,100)  scale(1.25) translate(-100,-100)');
   });
 
-  it('silhouetteTransform with rotation', () => {
+  it('with rotation', () => {
     expect(P.silhouetteTransform({ ...init(), scale: 1, silhouetteRotated: true }))
       .toBe('translate(100,100) rotate(90) scale(1) translate(-100,-100)');
   });
 });
 
 describe('presenter — dotPosRaw / dotPos', () => {
-  const shimonoseki = CITY_BOUNDS.shimonoseki;
   const insideShimonoseki = {
-    lat: (shimonoseki.north + shimonoseki.south) / 2,
-    lng: (shimonoseki.east + shimonoseki.west) / 2,
+    lat: (SHIMONOSEKI_BOUNDS.north + SHIMONOSEKI_BOUNDS.south) / 2,
+    lng: (SHIMONOSEKI_BOUNDS.east + SHIMONOSEKI_BOUNDS.west) / 2,
   };
 
   it('returns null when no userCoords', () => {
-    expect(P.dotPosRaw({ ...init(), cityIndex: 0, userCoords: null })).toBeNull();
+    const s = withCities({ ...init(), cityIndex: 0, userCoords: null }, sampleCities);
+    expect(P.dotPosRaw(s)).toBeNull();
+  });
+
+  it('returns null while cities are still loading', () => {
+    expect(P.dotPosRaw({ ...init(), userCoords: insideShimonoseki })).toBeNull();
   });
 
   it('returns null when coords are outside the city bbox', () => {
-    expect(
-      P.dotPosRaw({ ...init(), cityIndex: 0, userCoords: { lat: 0, lng: 0 } }),
-    ).toBeNull();
+    const s = withCities({ ...init(), cityIndex: 0, userCoords: { lat: 0, lng: 0 } }, sampleCities);
+    expect(P.dotPosRaw(s)).toBeNull();
   });
 
   it('projects center of the bbox to (100, 100)', () => {
-    const pos = P.dotPosRaw({ ...init(), cityIndex: 0, userCoords: insideShimonoseki });
+    const s = withCities({ ...init(), cityIndex: 0, userCoords: insideShimonoseki }, sampleCities);
+    const pos = P.dotPosRaw(s);
     expect(pos).not.toBeNull();
     expect(pos!.x).toBeCloseTo(100, 6);
     expect(pos!.y).toBeCloseTo(100, 6);
   });
 
   it('projects NW corner to (0, 0) and SE corner to (200, 200)', () => {
-    const nw = P.dotPosRaw({
-      ...init(),
-      cityIndex: 0,
-      userCoords: { lat: shimonoseki.north, lng: shimonoseki.west },
-    });
-    expect(nw).toEqual({ x: 0, y: 0 });
-    const se = P.dotPosRaw({
-      ...init(),
-      cityIndex: 0,
-      userCoords: { lat: shimonoseki.south, lng: shimonoseki.east },
-    });
-    expect(se).toEqual({ x: 200, y: 200 });
+    const nw = withCities({
+      ...init(), cityIndex: 0,
+      userCoords: { lat: SHIMONOSEKI_BOUNDS.north, lng: SHIMONOSEKI_BOUNDS.west },
+    }, sampleCities);
+    expect(P.dotPosRaw(nw)).toEqual({ x: 0, y: 0 });
+    const se = withCities({
+      ...init(), cityIndex: 0,
+      userCoords: { lat: SHIMONOSEKI_BOUNDS.south, lng: SHIMONOSEKI_BOUNDS.east },
+    }, sampleCities);
+    expect(P.dotPosRaw(se)).toEqual({ x: 200, y: 200 });
   });
 
   it('dotPos respects showLocation toggle', () => {
-    const base = { ...init(), cityIndex: 0, userCoords: insideShimonoseki };
+    const base = withCities({ ...init(), cityIndex: 0, userCoords: insideShimonoseki }, sampleCities);
     expect(P.dotPos({ ...base, showLocation: true })).not.toBeNull();
     expect(P.dotPos({ ...base, showLocation: false })).toBeNull();
   });
