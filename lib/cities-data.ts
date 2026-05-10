@@ -36,3 +36,41 @@ export async function loadCities(prefCode: string): Promise<City[]> {
   if (!res.ok) throw new Error(`Failed to load cities for prefecture ${prefCode} (${res.status})`);
   return (await res.json()) as City[];
 }
+
+// Flat index of every municipality's bbox, used by the top page so a
+// client-side GPS hit can match a municipality without fetching every
+// prefecture's full polygon JSON.
+export type BoundsEntry = CityBounds & {
+  code: string;
+  prefCode: string;
+  name: string;
+};
+
+export async function loadBounds(): Promise<BoundsEntry[]> {
+  const res = await fetch('/data/bounds.json');
+  if (!res.ok) throw new Error(`Failed to load bounds index (${res.status})`);
+  return (await res.json()) as BoundsEntry[];
+}
+
+// Pick the municipality whose bbox contains (lat, lng). Multiple bboxes
+// can match (e.g., a 政令市 parent overlaps; islands; nested coastlines)
+// — break ties by the smallest bbox area so a user in 横浜市西区 maps to
+// 横浜市 rather than to 神奈川県全体. Returns null if no bbox contains
+// the point.
+export function findMunicipality(
+  coords: { lat: number; lng: number },
+  bounds: BoundsEntry[],
+): BoundsEntry | null {
+  const { lat, lng } = coords;
+  let best: BoundsEntry | null = null;
+  let bestArea = Infinity;
+  for (const b of bounds) {
+    if (lat < b.south || lat > b.north || lng < b.west || lng > b.east) continue;
+    const area = (b.north - b.south) * (b.east - b.west);
+    if (area < bestArea) {
+      best = b;
+      bestArea = area;
+    }
+  }
+  return best;
+}

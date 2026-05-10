@@ -5,6 +5,8 @@ import { MapPin } from 'lucide-react';
 
 import type { Prefecture } from '@/lib/cities-data';
 
+import LocatePrompt from './locate-prompt';
+
 async function readPrefectures(): Promise<Prefecture[]> {
   const file = path.join(process.cwd(), 'public', 'data', 'prefectures.json');
   return JSON.parse(await fs.readFile(file, 'utf8'));
@@ -23,7 +25,9 @@ export default async function Home() {
         </div>
       </header>
 
-      <div className="px-4 pt-4 pb-2">
+      <LocatePrompt prefectures={prefectures} />
+
+      <div className="px-4 pt-2 pb-2">
         <h2 className="text-xs text-gray-300 tracking-[0.15em]">都道府県を選んでください</h2>
       </div>
 

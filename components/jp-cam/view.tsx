@@ -56,10 +56,11 @@ function StrokeIcon({ value, className = 'w-5 h-5' }: { value: number; className
 export type JpCameraProps = {
   prefCode: string;
   prefName: string;
+  initialCityId?: string;
   onBack?: () => void;
 };
 
-export default function JpCamera({ prefCode, prefName, onBack }: JpCameraProps) {
+export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: JpCameraProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -74,6 +75,20 @@ export default function JpCamera({ prefCode, prefName, onBack }: JpCameraProps) 
       dispatch({ type: 'prefectureSelected', prefCode });
     }
   }, [prefCode, state.prefCode]);
+
+  // Honor an `initialCityId` (from `?city=` query) once cities resolve.
+  // Only fires on the first ready transition for this prefCode so manual
+  // selections later in the session aren't overridden.
+  const initialCityAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.cities.kind !== 'ready' || !initialCityId) return;
+    if (initialCityAppliedRef.current === `${state.prefCode}:${initialCityId}`) return;
+    const idx = state.cities.cities.findIndex(c => c.id === initialCityId);
+    if (idx >= 0 && idx !== state.cityIndex) {
+      dispatch({ type: 'citySelected', index: idx });
+    }
+    initialCityAppliedRef.current = `${state.prefCode}:${initialCityId}`;
+  }, [state.cities, state.prefCode, state.cityIndex, initialCityId]);
 
   // Destructure for view-side ergonomics — keeps JSX nearly identical.
   const {
