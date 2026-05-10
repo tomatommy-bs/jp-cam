@@ -266,6 +266,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
     const snapshot: CapturedSnapshot = {
       width: w,
       height: h,
+      prefName,
       cityId: currentCity.id,
       cityName: currentCity.name,
       cityReading: currentCity.reading,
@@ -332,7 +333,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
         ctx.shadowOffsetY = 1;
         ctx.fillStyle = snap.color;
         ctx.globalAlpha = Math.min(snap.opacity + 0.1, 1);
-        ctx.fillText(`山口県 ${snap.cityName}`, 0, 0);
+        ctx.fillText(`${snap.prefName} ${snap.cityName}`, 0, 0);
 
         ctx.font = `${subSize}px -apple-system, sans-serif`;
         ctx.globalAlpha = Math.min(snap.opacity + 0.1, 1) * 0.75;

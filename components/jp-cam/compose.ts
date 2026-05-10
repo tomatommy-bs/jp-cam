@@ -107,7 +107,7 @@ export function buildExifBinary({ userCoords, capturedAt }: ExifInput): string {
   const exifObj: piexif.ExifDict = {
     '0th': {
       [piexif.ImageIFD.DateTime]: dt,
-      [piexif.ImageIFD.Software]: 'Yamaguchi 13',
+      [piexif.ImageIFD.Software]: 'JP-CAM',
     },
     Exif: {
       [piexif.ExifIFD.DateTimeOriginal]: dt,

@@ -15,6 +15,7 @@ export type FacingMode = 'environment' | 'user';
 export type CapturedSnapshot = {
   width: number;
   height: number;
+  prefName: string;
   cityId: string;
   cityName: string;
   cityReading: string;

@@ -25,6 +25,7 @@ export function makeSnapshot(overrides: Partial<CapturedSnapshot> = {}): Capture
   return {
     width: 800,
     height: 600,
+    prefName: '山口県',
     cityId: 'shimonoseki',
     cityName: '下関市',
     cityReading: 'SHIMONOSEKI',

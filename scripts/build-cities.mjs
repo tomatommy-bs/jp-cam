@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import polygonClipping from 'polygon-clipping';
+import { toRomaji } from 'wanakana';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -24,6 +25,51 @@ const OUT_DIR = path.join(ROOT, 'public', 'data');
 // This avoids the GitHub Contents-API rate limit on rebuilds.
 const NIIYZ_DIR = process.env.NIIYZ_DIR ?? '/tmp/niiyz';
 const NIIYZ_GEOJSON = path.join(NIIYZ_DIR, 'geojson');
+
+// Slim {5-digit-code: hiragana} index distilled from code4fukui/localgovjp.
+// Used to derive romaji "readings" for the watermark / city-info overlay
+// instead of falling back to the kanji name (which would look inconsistent
+// next to the prefecture-level Hepburn romaji).
+const KANA_INDEX = JSON.parse(
+  await fs.readFile(path.join(__dirname, 'municipality-kana.json'), 'utf8'),
+);
+
+// Suffix → kana endings the citykana field uses. 市/区 are 1-mora; 町/村
+// vary so we try both common readings.
+const SUFFIX_KANA = {
+  市: ['し'],
+  区: ['く'],
+  町: ['まち', 'ちょう'],
+  村: ['むら', 'そん'],
+};
+
+// Returns the kanji + kana with the trailing 市/区/町/村 stripped so the
+// derived romaji matches the existing Yamaguchi convention (e.g.
+// 下関市/しものせきし → SHIMONOSEKI, not SHIMONOSEKISHI).
+function stripMunicipalitySuffix(name, kana) {
+  const last = name.slice(-1);
+  const candidates = SUFFIX_KANA[last];
+  if (!candidates) return { stem: name, stemKana: kana };
+  for (const s of candidates) {
+    if (kana.endsWith(s)) return { stem: name.slice(0, -1), stemKana: kana.slice(0, -s.length) };
+  }
+  return { stem: name, stemKana: kana };
+}
+
+// Derive a Hepburn-uppercase reading from the official kana, falling back
+// to the kanji name when localgovjp doesn't list this code (rare; mostly
+// the parent of merged historical municipalities).
+function readingFor(code, name) {
+  let kana = KANA_INDEX[code];
+  if (!kana) return name; // fallback — keeps the entry usable
+  // Designated-city wards come back as "札幌市 中央区"; we want just the
+  // ward portion ("中央区" → ちゅうおうく). We don't actually emit ward-
+  // level entries (they're merged into the parent), but be defensive.
+  const sp = kana.lastIndexOf(' ');
+  if (sp >= 0) kana = kana.slice(sp + 1);
+  const { stemKana } = stripMunicipalitySuffix(name, kana);
+  return toRomaji(stemKana).toUpperCase();
+}
 
 const PREFECTURES = [
   ['01', '北海道', 'HOKKAIDO'],   ['02', '青森県', 'AOMORI'],     ['03', '岩手県', 'IWATE'],
@@ -289,14 +335,14 @@ async function buildPrefecture(prefCode, prefName) {
   });
   const all = [...standalone, ...aggregated].sort((a, b) => a.code.localeCompare(b.code));
 
-  return all.map(({ code, name, reading, polygons }) => {
+  return all.map(({ code, name, polygons }) => {
     const bounds = bboxOf(polygons);
     const projected = projectPolygons(polygons, bounds);
     const path = polygonsToPath(projected, 0.5);
     return {
       id: code,
       name,
-      reading: typeof reading === 'string' ? reading : name,
+      reading: readingFor(code, name),
       path,
       bounds: {
         north: +bounds.north.toFixed(4),
