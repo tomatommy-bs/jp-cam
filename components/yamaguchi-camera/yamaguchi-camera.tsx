@@ -109,12 +109,19 @@ export default function YamaguchiCamera() {
       dispatch({ type: 'geoFailed', message: '位置情報に対応していません' });
       return;
     }
-    const id = navigator.geolocation.watchPosition(
-      pos => dispatch({ type: 'coordsReceived', coords: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
-      err => dispatch({ type: 'geoFailed', message: err.message || '位置情報を取得できません' }),
+    let cancelled = false;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        if (cancelled) return;
+        dispatch({ type: 'coordsReceived', coords: { lat: pos.coords.latitude, lng: pos.coords.longitude } });
+      },
+      err => {
+        if (cancelled) return;
+        dispatch({ type: 'geoFailed', message: err.message || '位置情報を取得できません' });
+      },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
-    return () => navigator.geolocation.clearWatch(id);
+    return () => { cancelled = true; };
   }, []);
 
   // OFF でも撮影後のロゴには出すため、撮影スナップショットには常に dotPosRaw を入れる。
@@ -212,6 +219,7 @@ export default function YamaguchiCamera() {
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     const useCrop = isDigitalZoom && zoom > 1;
     const sw = useCrop ? baseCropW / zoom : baseCropW;
