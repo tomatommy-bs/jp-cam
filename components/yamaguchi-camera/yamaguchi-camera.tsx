@@ -3,12 +3,13 @@
 import React, { useRef, useEffect, useReducer } from 'react';
 import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn } from 'lucide-react';
 
-import { CITIES, init, SCALE_MAX, SCALE_MIN } from './state';
+import { init, SCALE_MAX, SCALE_MIN } from './state';
 import type {
   CapturedSnapshot,
   MaskMode,
   PersistedSettings,
 } from './state';
+import { CITIES } from '@/lib/city-database';
 import { update } from './update';
 import * as P from './presenter';
 import {

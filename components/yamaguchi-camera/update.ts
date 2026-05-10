@@ -3,7 +3,8 @@
 // composition) live in the view component, which dispatches Msgs.
 
 import type { State } from './state';
-import { CITIES, SCALE_MAX, SCALE_MIN } from './state';
+import { SCALE_MAX, SCALE_MIN } from './state';
+import { CITIES } from '@/lib/city-database';
 import type { Msg } from './message';
 
 function clampZoom(state: State, zoom: number): number {

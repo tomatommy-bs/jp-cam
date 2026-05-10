@@ -5,12 +5,12 @@
 
 import type {
   CapturedSnapshot,
-  City,
   MaskMode,
   State,
   ZoomCaps,
 } from './state';
-import { CITIES, CITY_BOUNDS } from './state';
+import type { City } from '@/lib/city-database';
+import { CITIES, CITY_BOUNDS } from '@/lib/city-database';
 
 export type Point = { x: number; y: number };
 

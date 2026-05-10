@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { State } from './state';
-import { CITIES, SCALE_MAX, SCALE_MIN, init } from './state';
+import { SCALE_MAX, SCALE_MIN, init } from './state';
+import { CITIES } from '@/lib/city-database';
 import { expectCaptured, makeSnapshot } from './test-helpers';
 import { update } from './update';
 

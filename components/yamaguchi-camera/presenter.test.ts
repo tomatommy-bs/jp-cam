@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import * as P from './presenter';
-import { CITIES, CITY_BOUNDS, init } from './state';
+import { init } from './state';
+import { CITIES, CITY_BOUNDS } from '@/lib/city-database';
 import { withCamera, withCaptured } from './test-helpers';
 
 describe('presenter — currentCity & silhouetteTransform', () => {
