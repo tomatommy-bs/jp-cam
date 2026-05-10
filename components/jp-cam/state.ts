@@ -1,8 +1,10 @@
-// State types and domain data for the yamaguchi-camera module.
+// State types and domain data for the camera module.
 //
 // Pure: no React, no DOM, no I/O. The view component owns all
 // side effects and dispatches Msgs (./message) into update
 // (./update) to transition between states defined here.
+
+import type { City } from '@/lib/cities-data';
 
 export type Coords = { lat: number; lng: number };
 export type ZoomCaps = { min: number; max: number; step: number };
@@ -34,6 +36,11 @@ export type CameraStatus =
   | { kind: 'ready'; zoomCaps: ZoomCaps | null }
   | { kind: 'error'; message: string };
 
+export type CitiesStatus =
+  | { kind: 'loading' }
+  | { kind: 'ready'; cities: City[] }
+  | { kind: 'error'; message: string };
+
 export type Capture =
   | { kind: 'idle' }
   | {
@@ -49,6 +56,9 @@ export type State = {
   camera: CameraStatus;
   facingMode: FacingMode;
   zoom: number;
+  // Prefecture / city catalog
+  prefCode: string;
+  cities: CitiesStatus;
   // Silhouette settings
   cityIndex: number;
   color: string;
@@ -88,11 +98,13 @@ export type PersistedSettings = {
 export const SCALE_MIN = 0.3;
 export const SCALE_MAX = 2;
 
-export function init(): State {
+export function init(prefCode: string = '35'): State {
   return {
     camera: { kind: 'loading' },
     facingMode: 'environment',
     zoom: 1,
+    prefCode,
+    cities: { kind: 'loading' },
     cityIndex: 0,
     color: '#ffffff',
     opacity: 0.9,

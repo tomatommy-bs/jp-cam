@@ -1,5 +1,24 @@
+import type { City } from '@/lib/cities-data';
+
 import type { CapturedSnapshot, MaskMode, State } from './state';
 import { init } from './state';
+
+export function makeCity(overrides: Partial<City> = {}): City {
+  return {
+    id: 'shimonoseki',
+    name: '下関市',
+    reading: 'SHIMONOSEKI',
+    path: 'M 0 0',
+    bounds: { north: 34.30, south: 33.95, east: 131.10, west: 130.85 },
+    ...overrides,
+  };
+}
+
+// Default state with cities resolved — convenient for tests that need
+// `state.cities.kind === 'ready'`. Pass an array to override.
+export function withCities(s: State, list: City[] = [makeCity()]): State {
+  return { ...s, cities: { kind: 'ready', cities: list } };
+}
 
 export function makeSnapshot(overrides: Partial<CapturedSnapshot> = {}): CapturedSnapshot {
   const i = init();
