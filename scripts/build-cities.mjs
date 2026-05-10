@@ -228,10 +228,13 @@ async function buildPrefecture(prefCode, prefName) {
     if (designated && cat === 'ward') {
       let bucket = collectors.get(designated.code);
       if (!bucket) {
-        bucket = { code: designated.code, name: designated.name, reading: designated.reading, polygons: [] };
+        // Keep wards keyed by their own code so the merge order is deterministic
+        // regardless of pool() arrival order — designated-city silhouettes would
+        // otherwise diff on every rebuild.
+        bucket = { code: designated.code, name: designated.name, reading: designated.reading, byWard: {} };
         collectors.set(designated.code, bucket);
       }
-      bucket.polygons.push(...polygons);
+      bucket.byWard[code] = polygons;
     } else if (cat === 'ward' && !isSpecialWard(code)) {
       // Unknown ward — skip (shouldn't occur)
       return;
@@ -240,7 +243,14 @@ async function buildPrefecture(prefCode, prefName) {
     }
   });
 
-  const all = [...standalone, ...collectors.values()].sort((a, b) => a.code.localeCompare(b.code));
+  // Flatten designated-city ward polygons in code-sorted order.
+  const aggregated = [...collectors.values()].map(b => ({
+    code: b.code,
+    name: b.name,
+    reading: b.reading,
+    polygons: Object.keys(b.byWard).sort().flatMap(k => b.byWard[k]),
+  }));
+  const all = [...standalone, ...aggregated].sort((a, b) => a.code.localeCompare(b.code));
 
   return all.map(({ code, name, reading, polygons }) => {
     const bounds = bboxOf(polygons);
@@ -259,6 +269,25 @@ async function buildPrefecture(prefCode, prefName) {
       },
     };
   });
+}
+
+async function emitBoundsIndex() {
+  // Flat array of every municipality's bbox (~140 KB). Loaded once on the
+  // top page so client-side GPS can match a municipality without fetching
+  // every prefecture's full polygon JSON.
+  const citiesDir = path.join(OUT_DIR, 'cities');
+  const files = (await fs.readdir(citiesDir)).filter(f => /^\d+\.json$/.test(f)).sort();
+  const out = [];
+  for (const f of files) {
+    const prefCode = f.replace('.json', '');
+    const cities = JSON.parse(await fs.readFile(path.join(citiesDir, f), 'utf8'));
+    for (const c of cities) {
+      out.push({ code: c.id, prefCode, name: c.name, ...c.bounds });
+    }
+  }
+  const json = JSON.stringify(out);
+  await fs.writeFile(path.join(OUT_DIR, 'bounds.json'), json);
+  console.log(`bounds.json: ${out.length} entries, ${(json.length / 1024).toFixed(1)} KB`);
 }
 
 async function main() {
@@ -287,6 +316,8 @@ async function main() {
     await fs.writeFile(path.join(OUT_DIR, 'prefectures.json'), JSON.stringify(index));
     console.log(`\nTotal: ${total} entries across ${targets.length} prefectures, ${(totalBytes / 1024 / 1024).toFixed(2)} MB`);
   }
+
+  await emitBoundsIndex();
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

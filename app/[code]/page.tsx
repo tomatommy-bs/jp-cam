@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { notFound } from 'next/navigation';
@@ -21,5 +22,9 @@ export default async function CameraPage({ params }: { params: Promise<{ code: s
   const list = await readPrefectures();
   const pref = list.find(p => p.code === code);
   if (!pref) notFound();
-  return <CameraClient prefCode={pref.code} prefName={pref.name} />;
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <CameraClient prefCode={pref.code} prefName={pref.name} />
+    </Suspense>
+  );
 }
