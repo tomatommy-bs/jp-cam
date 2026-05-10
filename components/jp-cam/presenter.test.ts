@@ -69,17 +69,33 @@ describe('presenter — dotPosRaw / dotPos', () => {
     expect(pos!.y).toBeCloseTo(100, 6);
   });
 
-  it('projects NW corner to (0, 0) and SE corner to (200, 200)', () => {
+  it('projects bbox corners onto the aspect-preserving fit window', () => {
+    // The longer post-cosLat side fills 200; the shorter is centered with
+    // padding. For Shimonoseki (lat span 0.35°, lng span ~0.21° after cosLat),
+    // the lng axis is letterboxed by offsetX.
+    const centerLat = (SHIMONOSEKI_BOUNDS.north + SHIMONOSEKI_BOUNDS.south) / 2;
+    const cosLat = Math.cos((centerLat * Math.PI) / 180);
+    const dx = (SHIMONOSEKI_BOUNDS.east - SHIMONOSEKI_BOUNDS.west) * cosLat;
+    const dy = SHIMONOSEKI_BOUNDS.north - SHIMONOSEKI_BOUNDS.south;
+    const scale = 200 / Math.max(dx, dy);
+    const offsetX = (200 - dx * scale) / 2;
+    const offsetY = (200 - dy * scale) / 2;
+
     const nw = withCities({
       ...init(), cityIndex: 0,
       userCoords: { lat: SHIMONOSEKI_BOUNDS.north, lng: SHIMONOSEKI_BOUNDS.west },
     }, sampleCities);
-    expect(P.dotPosRaw(nw)).toEqual({ x: 0, y: 0 });
+    const nwPos = P.dotPosRaw(nw);
+    expect(nwPos!.x).toBeCloseTo(offsetX, 6);
+    expect(nwPos!.y).toBeCloseTo(offsetY, 6);
+
     const se = withCities({
       ...init(), cityIndex: 0,
       userCoords: { lat: SHIMONOSEKI_BOUNDS.south, lng: SHIMONOSEKI_BOUNDS.east },
     }, sampleCities);
-    expect(P.dotPosRaw(se)).toEqual({ x: 200, y: 200 });
+    const sePos = P.dotPosRaw(se);
+    expect(sePos!.x).toBeCloseTo(200 - offsetX, 6);
+    expect(sePos!.y).toBeCloseTo(200 - offsetY, 6);
   });
 
   it('dotPos respects showLocation toggle', () => {

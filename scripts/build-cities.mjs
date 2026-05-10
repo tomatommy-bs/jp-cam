@@ -15,7 +15,13 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'public', 'data');
-const NIIYZ_RAW = 'https://raw.githubusercontent.com/niiyz/JapanCityGeoJson/master/geojson';
+
+// Source: niiyz/JapanCityGeoJson cloned locally. Set NIIYZ_DIR env var to
+// override; otherwise we fall back to /tmp/niiyz. Clone with:
+//   git clone --depth 1 https://github.com/niiyz/JapanCityGeoJson /tmp/niiyz
+// This avoids the GitHub Contents-API rate limit on rebuilds.
+const NIIYZ_DIR = process.env.NIIYZ_DIR ?? '/tmp/niiyz';
+const NIIYZ_GEOJSON = path.join(NIIYZ_DIR, 'geojson');
 
 const PREFECTURES = [
   ['01', '北海道', 'HOKKAIDO'],   ['02', '青森県', 'AOMORI'],     ['03', '岩手県', 'IWATE'],
@@ -90,20 +96,16 @@ async function pool(items, limit, fn) {
 }
 
 async function fetchPrefectureFiles(prefCode) {
-  const url = `https://api.github.com/repos/niiyz/JapanCityGeoJson/contents/geojson/${prefCode}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to list prefecture ${prefCode}: ${res.status}`);
-  const list = await res.json();
-  return list
-    .filter(e => e.name.endsWith('.json'))
-    .map(e => e.name.replace('.json', ''))
+  const dir = path.join(NIIYZ_GEOJSON, prefCode);
+  const entries = await fs.readdir(dir);
+  return entries
+    .filter(e => e.endsWith('.json'))
+    .map(e => e.replace('.json', ''))
     .sort();
 }
 
 async function fetchGeoJson(prefCode, code) {
-  const res = await fetch(`${NIIYZ_RAW}/${prefCode}/${code}.json`);
-  if (!res.ok) throw new Error(`Failed to fetch ${prefCode}/${code}: ${res.status}`);
-  return await res.json();
+  return JSON.parse(await fs.readFile(path.join(NIIYZ_GEOJSON, prefCode, `${code}.json`), 'utf8'));
 }
 
 function extractPolygons(geo) {
@@ -135,13 +137,25 @@ function bboxOf(polygons) {
   return { north: n, south: s, east: e, west: w };
 }
 
+// Keep this in lockstep with lib/projection.ts. cosLat compensates for
+// degrees of longitude being shorter than latitude at non-equator
+// latitudes; the longer post-cosLat dimension fills 200 with the shorter
+// one centered. The runtime GPS-pin projection uses the exact same
+// formula so the pin always lands at the geographically correct spot
+// inside the rendered silhouette.
 function projectPolygons(polygons, bbox) {
   const { east: E, west: W, north: N, south: S } = bbox;
-  const dx = E - W || 1;
-  const dy = N - S || 1;
+  const centerLat = (N + S) / 2;
+  const cosLat = Math.cos((centerLat * Math.PI) / 180);
+  const dxScaled = (E - W) * cosLat;
+  const dyScaled = N - S;
+  const span = Math.max(dxScaled, dyScaled) || 1;
+  const scale = 200 / span;
+  const offsetX = (200 - dxScaled * scale) / 2;
+  const offsetY = (200 - dyScaled * scale) / 2;
   return polygons.map(polygon => polygon.map(ring => ring.map(([lng, lat]) => [
-    ((lng - W) / dx) * 200,
-    ((N - lat) / dy) * 200,
+    (lng - W) * cosLat * scale + offsetX,
+    (N - lat) * scale + offsetY,
   ])));
 }
 
