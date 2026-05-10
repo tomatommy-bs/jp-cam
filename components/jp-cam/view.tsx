@@ -34,7 +34,7 @@ const STROKE_OPTIONS = [
 const SCALE_STEP = 0.1;
 const ZOOM_STEP = 0.5;
 
-const SETTINGS_STORAGE_KEY = 'yamaguchi-camera-settings';
+const SETTINGS_STORAGE_KEY = 'jp-cam-settings';
 
 function StrokeIcon({ value, className = 'w-5 h-5' }: { value: number; className?: string }) {
   if (value === 0) {
@@ -53,12 +53,27 @@ function StrokeIcon({ value, className = 'w-5 h-5' }: { value: number; className
   );
 }
 
-export default function YamaguchiCamera() {
+export type JpCameraProps = {
+  prefCode: string;
+  prefName: string;
+  onBack?: () => void;
+};
+
+export default function JpCamera({ prefCode, prefName, onBack }: JpCameraProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
 
-  const [state, dispatch] = useReducer(update, undefined, init);
+  const [state, dispatch] = useReducer(update, undefined, () => init(prefCode));
+
+  // If the parent re-mounts with a different prefCode (e.g., user navigates
+  // back and picks another prefecture), sync state so the next fetch effect
+  // can re-fire.
+  useEffect(() => {
+    if (state.prefCode !== prefCode) {
+      dispatch({ type: 'prefectureSelected', prefCode });
+    }
+  }, [prefCode, state.prefCode]);
 
   // Destructure for view-side ergonomics — keeps JSX nearly identical.
   const {
@@ -420,10 +435,15 @@ export default function YamaguchiCamera() {
       {/* Header */}
       <div className="px-4 py-2.5 flex items-center justify-between bg-black z-20 border-b border-white/5">
         <div className="flex items-center gap-2">
+          {onBack && (
+            <button onClick={onBack} className="p-1 -ml-1 rounded-full hover:bg-white/10 active:bg-white/20" title="都道府県を選び直す">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
           <MapPin className="w-4 h-4 text-amber-400" />
           <div>
-            <h1 className="text-sm font-bold tracking-wide">YAMAGUCHI 13</h1>
-            <p className="text-[9px] text-gray-400 leading-none">山口県13市シルエットカメラ</p>
+            <h1 className="text-sm font-bold tracking-wide">{prefName}</h1>
+            <p className="text-[9px] text-gray-400 leading-none">JP-CAM 市区町村シルエットカメラ</p>
           </div>
         </div>
         <div className="flex items-center gap-1">

@@ -1,4 +1,4 @@
-// Pure helpers used by the view layer (yamaguchi-camera.tsx).
+// Pure helpers used by the view layer (view.tsx).
 // No DOM, no React, no I/O — split out so they can be unit tested
 // without a browser environment.
 

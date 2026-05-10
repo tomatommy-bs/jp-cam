@@ -7,8 +7,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'YAMAGUCHI 13 - 山口県13市シルエットカメラ',
-  description: '山口県内13市の地形シルエットをカメラ映像にオーバーレイ表示。市の形を意識した撮影体験を提供する地域PR・観光・教育向けWebアプリ。',
+  title: 'JP-CAM - 日本全国 市区町村シルエットカメラ',
+  description: '日本全国の市区町村のシルエットをカメラ映像にオーバーレイ表示。地域の形を意識した撮影体験を提供する地域PR・観光・教育向けWebアプリ。',
   generator: 'v0.app',
   icons: {
     icon: [
