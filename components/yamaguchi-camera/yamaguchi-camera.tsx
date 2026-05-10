@@ -221,6 +221,7 @@ export default function YamaguchiCamera() {
       cityReading: currentCity.reading,
       cityPath: currentCity.path,
       silhouetteTransform,
+      silhouetteRotated,
       color,
       opacity,
       strokeWidth,
@@ -254,6 +255,22 @@ export default function YamaguchiCamera() {
         const w = snap.width;
         const h = snap.height;
         const fontSize = Math.max(18, Math.floor(h / 32));
+        const subSize = Math.max(10, Math.floor(fontSize * 0.45));
+        const iconSize = fontSize * 2;
+        const margin = 28;
+
+        // Anchor = bottom-right of the watermark block in the local frame.
+        // Rotated layout: move to bottom-left of the photo and rotate 90° CW
+        // so the watermark reads upright when the photo is viewed turned 90°
+        // CCW (matching the rotated silhouette).
+        ctx.save();
+        if (snap.silhouetteRotated) {
+          ctx.translate(margin, h - margin);
+          ctx.rotate(Math.PI / 2);
+        } else {
+          ctx.translate(w - margin, h - margin);
+        }
+
         ctx.font = `bold ${fontSize}px -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'bottom';
@@ -263,17 +280,15 @@ export default function YamaguchiCamera() {
         ctx.shadowOffsetY = 1;
         ctx.fillStyle = snap.color;
         ctx.globalAlpha = Math.min(snap.opacity + 0.1, 1);
-        ctx.fillText(`山口県 ${snap.cityName}`, w - 28, h - 28);
-        const subSize = Math.max(10, Math.floor(fontSize * 0.45));
+        ctx.fillText(`山口県 ${snap.cityName}`, 0, 0);
+
         ctx.font = `${subSize}px -apple-system, sans-serif`;
         ctx.globalAlpha = Math.min(snap.opacity + 0.1, 1) * 0.75;
-        ctx.fillText(snap.cityReading, w - 28, h - 28 - fontSize - 4);
+        ctx.fillText(snap.cityReading, 0, -fontSize - 4);
 
-        const iconSize = fontSize * 2;
-        const iconRight = w - 28;
-        const iconBottom = h - 28 - fontSize - 4 - subSize - 6;
+        const iconBottom = -fontSize - 4 - subSize - 6;
         ctx.save();
-        ctx.translate(iconRight - iconSize, iconBottom - iconSize);
+        ctx.translate(-iconSize, iconBottom - iconSize);
         ctx.scale(iconSize / 200, iconSize / 200);
         const path = new Path2D(snap.cityPath);
         ctx.fillStyle = snap.color;
@@ -293,6 +308,7 @@ export default function YamaguchiCamera() {
         }
         ctx.restore();
 
+        ctx.restore();
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
       };

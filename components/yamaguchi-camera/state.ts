@@ -18,6 +18,7 @@ export type CapturedSnapshot = {
   cityReading: string;
   cityPath: string;
   silhouetteTransform: string;
+  silhouetteRotated: boolean;
   color: string;
   opacity: number;
   strokeWidth: number;
