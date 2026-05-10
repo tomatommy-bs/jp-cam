@@ -11,6 +11,7 @@ export function makeSnapshot(overrides: Partial<CapturedSnapshot> = {}): Capture
     cityReading: 'SHIMONOSEKI',
     cityPath: 'M 0 0',
     silhouetteTransform: 'translate(100,100) scale(1) translate(-100,-100)',
+    silhouetteRotated: i.silhouetteRotated,
     color: i.color,
     opacity: i.opacity,
     strokeWidth: i.strokeWidth,
