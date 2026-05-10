@@ -86,19 +86,21 @@ export const CITIES: readonly City[] = [
   }
 ];
 
-// Approximate lat/lng bounding boxes per city — used to project user GPS into 0-200 SVG space.
+// Lat/lng bounding boxes per city — used to project user GPS into 0-200 SVG space.
+// Computed from N03 administrative boundary GeoJSON (niiyz/JapanCityGeoJson) and
+// rounded to 4 decimals (~11m at this latitude). Includes outlying islands.
 export const CITY_BOUNDS: Record<string, CityBounds> = {
-  shimonoseki: { north: 34.30, south: 33.95, east: 131.10, west: 130.85 },
-  ube:         { north: 34.10, south: 33.92, east: 131.45, west: 131.20 },
-  yamaguchi:   { north: 34.40, south: 34.00, east: 131.65, west: 131.30 },
-  hagi:        { north: 34.65, south: 34.20, east: 131.80, west: 131.25 },
-  hofu:        { north: 34.15, south: 34.00, east: 131.65, west: 131.50 },
-  kudamatsu:   { north: 34.15, south: 33.95, east: 132.00, west: 131.85 },
-  iwakuni:     { north: 34.45, south: 33.95, east: 132.20, west: 131.80 },
-  hikari:      { north: 34.10, south: 33.90, east: 132.00, west: 131.85 },
-  nagato:      { north: 34.54, south: 34.16, east: 131.37, west: 130.90 },
-  yanai:       { north: 34.00, south: 33.85, east: 132.20, west: 132.05 },
-  mine:          { north: 34.40, south: 34.10, east: 131.40, west: 131.05 },
-  shunan:        { north: 34.30, south: 33.95, east: 132.05, west: 131.55 },
-  'sanyo-onoda': { north: 34.10, south: 33.90, east: 131.25, west: 131.05 },
+  shimonoseki:   { north: 34.3755, south: 33.9111, east: 131.1725, west: 130.7748 },
+  ube:           { north: 34.1670, south: 33.9190, east: 131.3802, west: 131.1835 },
+  yamaguchi:     { north: 34.5045, south: 33.9674, east: 131.7955, west: 131.2920 },
+  hagi:          { north: 34.7994, south: 34.2102, east: 131.7276, west: 131.1263 },
+  hofu:          { north: 34.1605, south: 33.9274, east: 131.7018, west: 131.4552 },
+  kudamatsu:     { north: 34.1149, south: 33.9289, east: 131.9362, west: 131.7989 },
+  iwakuni:       { north: 34.4695, south: 33.9797, east: 132.4352, west: 131.8784 },
+  hikari:        { north: 34.0330, south: 33.8513, east: 132.0642, west: 131.8916 },
+  nagato:        { north: 34.4423, south: 34.2619, east: 131.3494, west: 130.9274 },
+  yanai:         { north: 34.0529, south: 33.7648, east: 132.2740, west: 132.0572 },
+  mine:          { north: 34.3367, south: 34.0817, east: 131.4096, west: 131.0824 },
+  shunan:        { north: 34.3562, south: 33.9678, east: 132.0308, west: 131.6342 },
+  'sanyo-onoda': { north: 34.1196, south: 33.9304, east: 131.2269, west: 131.0678 },
 };
