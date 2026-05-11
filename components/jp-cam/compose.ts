@@ -90,6 +90,24 @@ export function captureFilename(cityId: string, timestamp: number = Date.now()):
   return `yamaguchi_${cityId}_${timestamp}.jpg`;
 }
 
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(',');
+  if (!dataUrl.startsWith('data:') || comma < 0) {
+    throw new Error('Invalid data URL');
+  }
+  const meta = dataUrl.slice(5, comma);
+  const isBase64 = meta.endsWith(';base64');
+  const mime = (isBase64 ? meta.slice(0, -7) : meta).split(';')[0] || 'application/octet-stream';
+  const payload = dataUrl.slice(comma + 1);
+  if (!isBase64) {
+    return new Blob([decodeURIComponent(payload)], { type: mime });
+  }
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
 // EXIF DateTime format is `YYYY:MM:DD HH:MM:SS` in local time. Note that
 // the date separator is `:` (not `-`) — this is the EXIF spec, not a typo.
 export function formatExifDateTime(d: Date): string {

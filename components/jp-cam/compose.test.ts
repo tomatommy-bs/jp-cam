@@ -5,6 +5,7 @@ import {
   cameraErrorMessage,
   captureFilename,
   computeCaptureCrop,
+  dataUrlToBlob,
   deriveZoomCaps,
   formatExifDateTime,
 } from './compose';
@@ -165,6 +166,29 @@ describe('captureFilename', () => {
     const ts = Number(match![1]);
     expect(ts).toBeGreaterThanOrEqual(before);
     expect(ts).toBeLessThanOrEqual(after);
+  });
+});
+
+describe('dataUrlToBlob', () => {
+  it('decodes a base64 JPEG data URL into a Blob of the same bytes', async () => {
+    // 4 bytes: 0xFF 0xD8 0xFF 0xE0 — start of a real JPEG header
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+    const b64 = Buffer.from(bytes).toString('base64');
+    const blob = dataUrlToBlob(`data:image/jpeg;base64,${b64}`);
+    expect(blob.type).toBe('image/jpeg');
+    expect(blob.size).toBe(4);
+    const out = new Uint8Array(await blob.arrayBuffer());
+    expect(Array.from(out)).toEqual(Array.from(bytes));
+  });
+
+  it('strips parameters from the media type', () => {
+    const b64 = Buffer.from('hi').toString('base64');
+    const blob = dataUrlToBlob(`data:image/jpeg;charset=utf-8;base64,${b64}`);
+    expect(blob.type).toBe('image/jpeg');
+  });
+
+  it('throws on a non-data URL', () => {
+    expect(() => dataUrlToBlob('https://example.com/x.jpg')).toThrow();
   });
 });
 
