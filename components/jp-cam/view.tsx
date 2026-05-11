@@ -19,6 +19,7 @@ import {
   cameraErrorMessage,
   captureFilename,
   computeCaptureCrop,
+  dataUrlToBlob,
   deriveZoomCaps,
 } from './compose';
 
@@ -431,19 +432,37 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
 
   const handleRetake = () => dispatch({ type: 'captureCleared' });
 
-  const downloadDataUrl = (dataUrl: string, cityId: string) => {
+  const downloadViaAnchor = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
     link.href = dataUrl;
-    link.download = captureFilename(cityId);
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!capturedImage) return;
     const cityId = capturedSnapshot?.cityId ?? currentCity?.id ?? 'unknown';
-    downloadDataUrl(capturedImage, cityId);
+    const filename = captureFilename(cityId);
+
+    // iOS Safari ignores <a download>, so prefer the Web Share API which
+    // surfaces the native share sheet ("写真に追加" / "画像を保存"). Falls back
+    // to the anchor-click trick on desktop where share-with-files is absent.
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        const file = new File([dataUrlToBlob(capturedImage)], filename, { type: 'image/jpeg' });
+        if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+          return;
+        }
+      } catch (err) {
+        // User cancelled the share sheet — don't fall back to a download.
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+      }
+    }
+
+    downloadViaAnchor(capturedImage, filename);
   };
 
   return (
