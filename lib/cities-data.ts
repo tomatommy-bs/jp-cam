@@ -23,6 +23,14 @@ export type City = {
   reading: string;
   path: string; // SVG path string on a 0-200 viewBox
   bounds: CityBounds;
+  // Optional: official hiragana for this code (e.g., "しものせきし").
+  // Missing for the 北方領土 villages and a few historical merges where
+  // localgovjp has no entry. The city picker's search / 50音 tabs treat
+  // these as unmatched-on-kana but still searchable by name / reading.
+  kana?: string;
+  // Optional: Hokkaido 振興局 (subprefecture) id — populated only for
+  // prefCode === '01'. See scripts/hokkaido-subregion.mjs.
+  subregion?: string;
 };
 
 export async function loadPrefectures(): Promise<Prefecture[]> {

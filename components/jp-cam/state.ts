@@ -76,6 +76,7 @@ export type State = {
   // UI
   showSettings: boolean;
   activeMenu: Menu | null;
+  cityPickerOpen: boolean;
   // Capture / preview-edit flow
   capture: Capture;
   // Persistence
@@ -119,6 +120,7 @@ export function init(prefCode: string = '35'): State {
     showLocationPin: true,
     showSettings: false,
     activeMenu: null,
+    cityPickerOpen: false,
     capture: { kind: 'idle' },
     settingsLoaded: false,
   };

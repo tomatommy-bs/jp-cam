@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useReducer } from 'react';
-import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn } from 'lucide-react';
+import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn, Search } from 'lucide-react';
 
 import { init, SCALE_MAX, SCALE_MIN } from './state';
 import type {
@@ -22,6 +22,7 @@ import {
   dataUrlToBlob,
   deriveZoomCaps,
 } from './compose';
+import CityPickerSheet from './city-picker-sheet';
 
 // View-side constants — UI choices, not domain data.
 const COLORS = ['#ffffff', '#fbbf24', '#fb7185', '#60a5fa', '#34d399', '#a78bfa', '#000000'];
@@ -95,7 +96,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
   const {
     facingMode, zoom, cityIndex, color, opacity, scale, strokeWidth,
     maskMode, silhouetteRotated, userCoords, geoError, showLocation,
-    showLocationPin, showSettings, activeMenu, capture,
+    showLocationPin, showSettings, activeMenu, cityPickerOpen, capture,
   } = state;
 
   // Pure derivations come from presenter — view just picks them up by name.
@@ -693,42 +694,62 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
       </div>
 
       {/* City selector */}
-      <div className="bg-black px-1 py-2 flex items-center gap-1 border-t border-white/5">
-        <button 
+      <div className="bg-black px-2 py-2 flex items-center gap-1.5 border-t border-white/5">
+        <button
           onClick={() => dispatch({ type: 'cityStepped', delta: -1 })}
-          className="p-2 rounded-full hover:bg-white/10 active:bg-white/20 flex-shrink-0"
+          disabled={cities.length === 0}
+          className="p-2 rounded-full hover:bg-white/10 active:bg-white/20 flex-shrink-0 disabled:opacity-30"
+          aria-label="前の市区町村"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <div className="flex-1 overflow-x-auto flex gap-1.5 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-          <style>{`div::-webkit-scrollbar { display: none; }`}</style>
-          {citiesLoading && (
-            <div className="px-3 py-1.5 text-[11px] text-gray-400">都市データ読込中…</div>
-          )}
-          {citiesError && (
-            <div className="px-3 py-1.5 text-[11px] text-red-300">読込失敗: {citiesError}</div>
-          )}
-          {cities.map((city, i) => (
-            <button
-              key={city.id}
-              onClick={() => dispatch({ type: 'citySelected', index: i })}
-              className={`px-3 py-1.5 rounded-full text-[11px] whitespace-nowrap flex-shrink-0 transition-all ${
-                i === cityIndex
-                  ? 'bg-white text-black font-semibold'
-                  : 'bg-white/10 text-gray-200 hover:bg-white/20'
-              }`}
-            >
-              {city.name}
-            </button>
-          ))}
-        </div>
-        <button 
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'cityPickerOpened' })}
+          disabled={cities.length === 0}
+          className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2 rounded-full bg-white/[0.08] border border-white/15 hover:bg-white/15 active:bg-white/25 disabled:opacity-50 transition-colors"
+          aria-haspopup="dialog"
+          aria-expanded={cityPickerOpen}
+        >
+          <Search className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          <span className="flex-1 min-w-0 text-left truncate">
+            {citiesLoading
+              ? <span className="text-[11px] text-gray-400">都市データ読込中…</span>
+              : citiesError
+                ? <span className="text-[11px] text-red-300">読込失敗: {citiesError}</span>
+                : currentCity
+                  ? (
+                    <span className="flex items-baseline gap-1.5">
+                      <span className="text-[13px] font-semibold leading-tight">{currentCity.name}</span>
+                      <span className="text-[10px] text-gray-400 tabular-nums">
+                        {String(cityIndex + 1).padStart(2, '0')}/{cities.length}
+                      </span>
+                    </span>
+                  )
+                  : <span className="text-[11px] text-gray-400">市区町村を選ぶ</span>}
+          </span>
+          <span className="text-[10px] text-gray-400 flex-shrink-0">選ぶ</span>
+        </button>
+        <button
           onClick={() => dispatch({ type: 'cityStepped', delta: 1 })}
-          className="p-2 rounded-full hover:bg-white/10 active:bg-white/20 flex-shrink-0"
+          disabled={cities.length === 0}
+          className="p-2 rounded-full hover:bg-white/10 active:bg-white/20 flex-shrink-0 disabled:opacity-30"
+          aria-label="次の市区町村"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
+
+      {cityPickerOpen && cities.length > 0 && (
+        <CityPickerSheet
+          prefCode={state.prefCode}
+          prefName={prefName}
+          cities={cities}
+          cityIndex={cityIndex}
+          onSelect={(index) => dispatch({ type: 'citySelected', index })}
+          onClose={() => dispatch({ type: 'cityPickerClosed' })}
+        />
+      )}
 
       {/* Capture button */}
       <div className="bg-black px-4 pt-3 pb-5 relative flex justify-center items-center">
