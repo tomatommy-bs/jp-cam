@@ -274,7 +274,20 @@ function ringToPath(ring) {
 
 function polygonsToPath(polygons, tol = 0.5) {
   return polygons
-    .flatMap(polygon => polygon.map(ring => ringToPath(simplifyRing(ring, tol))))
+    .flatMap(polygon => polygon.map(ring => simplifyRing(ring, tol)))
+    .filter(ring => {
+      // Drop sub-pixel rings — niiyz packs tiny structures (buildings, etc.)
+      // as ring siblings, which after the union-fix are preserved as their
+      // own polygons. At 200×200 they're invisible but inflate the path.
+      if (ring.length < 4) return false;
+      let n = -Infinity, s = Infinity, e = -Infinity, w = Infinity;
+      for (const [x, y] of ring) {
+        if (y > n) n = y; if (y < s) s = y;
+        if (x > e) e = x; if (x < w) w = x;
+      }
+      return (e - w) >= tol || (n - s) >= tol;
+    })
+    .map(ringToPath)
     .filter(Boolean)
     .join(' ');
 }
@@ -331,9 +344,15 @@ async function buildPrefecture(prefCode, prefName) {
   // silhouette shows internal ward dividers as double-stroked lines).
   const aggregated = [...collectors.values()].map(b => {
     const wardCodes = Object.keys(b.byWard).sort();
-    // Each ward = array of GeoJSON Polygon (rings). polygon-clipping wants
-    // MultiPolygons (= array of Polygons). Wrap and union them all.
-    const inputs = wardCodes.map(k => b.byWard[k]); // array of MultiPolygons
+    // niiyz packs offshore islands as additional rings inside a single
+    // Polygon (e.g. 玄界島 in 福岡市西区, 八景島 in 横浜市金沢区, 馬島 in
+    // 北九州市). polygon-clipping treats every non-first ring as a hole,
+    // which silently strips those islands from the merged silhouette.
+    // Promote each ring to its own single-ring Polygon so the union sees
+    // every land mass as a distinct shape.
+    const inputs = wardCodes.map(k =>
+      b.byWard[k].flatMap(polygon => polygon.map(ring => [ring])),
+    );
     const merged = inputs.length === 1
       ? inputs[0]
       : polygonClipping.union(inputs[0], ...inputs.slice(1));
