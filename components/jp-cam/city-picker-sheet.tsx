@@ -204,8 +204,8 @@ export default function CityPickerSheet({
                   }`}
                 >
                   <div className="text-sm font-semibold leading-tight">{city.name}</div>
-                  <div className={`text-[10px] leading-tight mt-0.5 ${selected ? 'text-gray-500' : 'text-gray-400'}`}>
-                    {city.kana ?? city.reading}
+                  <div className={`text-[10px] leading-tight mt-0.5 tracking-[0.1em] ${selected ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {city.reading}
                   </div>
                 </button>
               );
