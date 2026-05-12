@@ -219,8 +219,14 @@ describe('update — silhouette settings', () => {
   });
 
   it('islandLevelSet stores the chosen level', () => {
-    expect(update(init(), { type: 'islandLevelSet', level: 0 }).islandLevel).toBe(0);
+    expect(update(init(), { type: 'islandLevelSet', level: 1 }).islandLevel).toBe(1);
     expect(update(init(), { type: 'islandLevelSet', level: 2 }).islandLevel).toBe(2);
+  });
+
+  it('islandHelpToggled flips the help-open flag', () => {
+    const opened = update(init(), { type: 'islandHelpToggled' });
+    expect(opened.islandHelpOpen).toBe(true);
+    expect(update(opened, { type: 'islandHelpToggled' }).islandHelpOpen).toBe(false);
   });
 
   it('scaleNudged clamps to SCALE_MIN..SCALE_MAX', () => {

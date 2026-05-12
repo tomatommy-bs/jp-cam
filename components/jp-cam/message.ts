@@ -27,6 +27,7 @@ export type Msg =
   | { type: 'maskModeSet'; mode: MaskMode }
   | { type: 'silhouetteRotateToggled' }
   | { type: 'islandLevelSet'; level: IslandLevel }
+  | { type: 'islandHelpToggled' }
   // Geolocation
   | { type: 'coordsReceived'; coords: Coords }
   | { type: 'geoFailed'; message: string }

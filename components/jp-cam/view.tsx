@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useReducer } from 'react';
-import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn, Search } from 'lucide-react';
+import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn, Search, HelpCircle } from 'lucide-react';
 
 import { init, SCALE_MAX, SCALE_MIN } from './state';
 import type {
@@ -95,7 +95,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
   // Destructure for view-side ergonomics — keeps JSX nearly identical.
   const {
     facingMode, zoom, cityIndex, color, opacity, scale, strokeWidth,
-    maskMode, silhouetteRotated, islandLevel, userCoords, geoError, showLocation,
+    maskMode, silhouetteRotated, islandLevel, islandHelpOpen, userCoords, geoError, showLocation,
     showLocationPin, showSettings, activeMenu, cityPickerOpen, capture,
   } = state;
 
@@ -683,12 +683,36 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide">ISLANDS</label>
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <label className="text-[10px] text-gray-400 tracking-wide">ISLANDS</label>
+                    <button
+                      type="button"
+                      onClick={() => dispatch({ type: 'islandHelpToggled' })}
+                      className={`p-0.5 rounded-full transition-colors ${
+                        islandHelpOpen ? 'text-white bg-white/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
+                      }`}
+                      aria-expanded={islandHelpOpen}
+                      aria-label="ISLANDS の説明"
+                    >
+                      <HelpCircle className="w-3 h-3" />
+                    </button>
+                  </div>
+                  {islandHelpOpen && (
+                    <p className="text-[10px] text-gray-300 leading-relaxed mb-1.5 px-2 py-1.5 rounded bg-white/[0.04] border border-white/10">
+                      離島まで含めるとシルエットが小さく偏ることがあります。表示する島の範囲を選べます。
+                      <br />
+                      <span className="text-gray-400">・全島: すべての離島を含む</span>
+                      <br />
+                      <span className="text-gray-400">・標準: 遠隔の小さな島を省略</span>
+                      <br />
+                      <span className="text-gray-400">・本島のみ: 最大の島だけ表示</span>
+                    </p>
+                  )}
                   <div className="grid grid-cols-3 gap-1.5">
                     {([
-                      { level: 0, label: '全島', available: hasFullVariant },
-                      { level: 1, label: '標準', available: true },
-                      { level: 2, label: '本島', available: hasMainOnlyVariant },
+                      { level: 0, label: '全島', beta: false, available: true },
+                      { level: 1, label: '標準', beta: true,  available: hasFullVariant },
+                      { level: 2, label: '本島', beta: true,  available: hasMainOnlyVariant },
                     ] as const).map(opt => {
                       const active = islandLevel === opt.level;
                       const disabled = !opt.available && !active;
@@ -697,7 +721,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                           key={opt.level}
                           onClick={() => !disabled && dispatch({ type: 'islandLevelSet', level: opt.level })}
                           disabled={disabled}
-                          className={`py-1.5 rounded text-[11px] transition-colors ${
+                          className={`relative py-1.5 rounded text-[11px] transition-colors ${
                             active
                               ? 'bg-white text-black font-semibold'
                               : disabled
@@ -708,6 +732,16 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                           title={disabled ? 'この市区町村では切替不要' : undefined}
                         >
                           {opt.label}
+                          {opt.beta && (
+                            <span
+                              className={`absolute -top-1 -right-1 px-1 py-px rounded text-[7px] font-bold leading-none tracking-wider ${
+                                active ? 'bg-amber-500 text-black' : 'bg-amber-500/80 text-black'
+                              }`}
+                              aria-label="ベータ版"
+                            >
+                              β
+                            </span>
+                          )}
                         </button>
                       );
                     })}

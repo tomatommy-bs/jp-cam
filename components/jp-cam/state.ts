@@ -78,6 +78,7 @@ export type State = {
   showSettings: boolean;
   activeMenu: Menu | null;
   cityPickerOpen: boolean;
+  islandHelpOpen: boolean;
   // Capture / preview-edit flow
   capture: Capture;
   // Persistence
@@ -116,7 +117,7 @@ export function init(prefCode: string = '35'): State {
     strokeWidth: 1.65,
     maskMode: 'translucent',
     silhouetteRotated: false,
-    islandLevel: 1,
+    islandLevel: 0,
     userCoords: null,
     geoError: null,
     showLocation: true,
@@ -124,6 +125,7 @@ export function init(prefCode: string = '35'): State {
     showSettings: false,
     activeMenu: null,
     cityPickerOpen: false,
+    islandHelpOpen: false,
     capture: { kind: 'idle' },
     settingsLoaded: false,
   };

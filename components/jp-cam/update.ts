@@ -112,6 +112,8 @@ export function update(state: State, msg: Msg): State {
       return { ...state, silhouetteRotated: !state.silhouetteRotated };
     case 'islandLevelSet':
       return { ...state, islandLevel: msg.level };
+    case 'islandHelpToggled':
+      return { ...state, islandHelpOpen: !state.islandHelpOpen };
     case 'coordsReceived':
       return { ...state, userCoords: msg.coords, geoError: null };
     case 'geoFailed':
