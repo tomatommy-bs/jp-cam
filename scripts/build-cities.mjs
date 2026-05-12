@@ -206,6 +206,109 @@ function bboxOf(polygons) {
   return { north: n, south: s, east: e, west: w };
 }
 
+// Shoelace on the outer ring; returns absolute signed area in deg².
+function ringAreaDeg2(ring) {
+  let a = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [x1, y1] = ring[i];
+    const [x2, y2] = ring[i + 1];
+    a += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(a) / 2;
+}
+
+// Approximate polygon area in km² using shoelace on the outer ring +
+// cosLat correction at the polygon's center. Holes are ignored — for
+// classification purposes the outer ring is what matters.
+function polygonAreaKm2(polygon) {
+  const bb = bboxOf([polygon]);
+  const centerLat = (bb.north + bb.south) / 2;
+  const cosLat = Math.cos((centerLat * Math.PI) / 180);
+  const a = ringAreaDeg2(polygon[0]) * cosLat;
+  return a * 111 * 111;
+}
+
+// Approximate min distance between two lat/lng bboxes in km. 0 when they
+// overlap. Used as a fast proxy for "polygon i is far from main" — exact
+// point-to-point min distance is O(n*m) per pair and not worth the cost
+// at our scale, while bbox-to-bbox is conservative (returns 0 whenever
+// the polygons interlock, which is exactly when we'd want to keep them).
+function bboxDistanceKm(a, b) {
+  const aLat = (a.north + a.south) / 2;
+  const bLat = (b.north + b.south) / 2;
+  const cosLat = Math.cos((((aLat + bLat) / 2) * Math.PI) / 180);
+  let dx = 0;
+  if (a.west > b.east) dx = a.west - b.east;
+  else if (b.west > a.east) dx = b.west - a.east;
+  let dy = 0;
+  if (a.south > b.north) dy = a.south - b.north;
+  else if (b.south > a.north) dy = b.south - a.north;
+  return Math.hypot(dx * cosLat * 111, dy * 111);
+}
+
+// Island-trimming thresholds. See docs/build-cities-classification (the
+// rationale lives there) — α/β are the level-1 "drop tiny + remote" rule;
+// δ is the archipelago-guard ratio that disables main-only trimming when
+// no single polygon dominates (小笠原村, 十島村, 三島村, etc.).
+const ALPHA = 0.02; // area_i / area_main below this is candidate to drop
+const BETA  = 0.5;  // dist_i / √area_main above this is candidate to drop
+const DELTA = 0.5;  // area_main / area_total below this → archipelago
+
+// niiyz frequently packs offshore islands as additional rings inside a
+// single Polygon (e.g. 萩市's 見島・大島, 唐津市's 加唐島群, 八丈町's 八丈
+// 小島). Under the GeoJSON spec those are holes, but niiyz uses them as
+// land. For classification we need each ring as its own component, so
+// promote rings to single-ring "polygons" before bucketing. This stays
+// faithful to the downstream `polygonsToPath` which already flattens
+// rings into independent fills.
+function promoteRingsToPolygons(polygons) {
+  return polygons.flatMap(polygon => polygon.map(ring => [ring]));
+}
+
+// Split a city's polygons into three buckets:
+//   - main: the largest connected component (or [], when archipelago)
+//   - near: kept at level 1 (standard) and level 0 (full)
+//   - far:  kept only at level 0
+//
+// Archipelago cities (no dominant main) → main empty, all polygons in
+// `near`. The view then surfaces the same silhouette for level 1 and
+// level 2 (本島のみ falls back to standard).
+function classifyPolygons(polygons) {
+  const units = promoteRingsToPolygons(polygons);
+  if (units.length <= 1) {
+    return { main: units.slice(), near: [], far: [], archipelago: false };
+  }
+  const enriched = units.map(p => ({
+    p,
+    bb: bboxOf([p]),
+    area: polygonAreaKm2(p),
+  }));
+  enriched.sort((a, b) => b.area - a.area);
+  const total = enriched.reduce((s, e) => s + e.area, 0);
+  const main = enriched[0];
+  if (total === 0 || main.area / total < DELTA) {
+    return {
+      main: [],
+      near: enriched.map(e => e.p),
+      far: [],
+      archipelago: true,
+    };
+  }
+  const sqrtMain = Math.sqrt(main.area);
+  const near = [];
+  const far = [];
+  for (const e of enriched.slice(1)) {
+    const ratio = e.area / main.area;
+    const dist = bboxDistanceKm(main.bb, e.bb);
+    if (ratio < ALPHA && dist / sqrtMain > BETA) {
+      far.push(e.p);
+    } else {
+      near.push(e.p);
+    }
+  }
+  return { main: [main.p], near, far, archipelago: false };
+}
+
 // Keep this in lockstep with lib/projection.ts. cosLat compensates for
 // degrees of longitude being shorter than latitude at non-equator
 // latitudes; the longer post-cosLat dimension fills 200 with the shorter
@@ -367,24 +470,51 @@ async function buildPrefecture(prefCode, prefName) {
   });
   const all = [...standalone, ...aggregated].sort((a, b) => a.code.localeCompare(b.code));
 
+  // Project + simplify a subset of polygons against their own bbox, emitting
+  // both the SVG path and the rounded bbox the runtime needs. Returns null
+  // when the subset is empty so callers can omit the field entirely.
+  function emitBucket(polys) {
+    if (polys.length === 0) return null;
+    const bb = bboxOf(polys);
+    return {
+      path: polygonsToPath(projectPolygons(polys, bb), 0.5),
+      bounds: {
+        north: +bb.north.toFixed(4),
+        south: +bb.south.toFixed(4),
+        east:  +bb.east.toFixed(4),
+        west:  +bb.west.toFixed(4),
+      },
+    };
+  }
+
   return all.map(({ code, name, polygons }) => {
-    const bounds = bboxOf(polygons);
-    const projected = projectPolygons(polygons, bounds);
-    const path = polygonsToPath(projected, 0.5);
+    const { main, near, far, archipelago } = classifyPolygons(polygons);
+
+    // `path` / `bounds` are the canonical level-1 (standard) silhouette —
+    // always present, drives the GPS-pin projection and the default render.
+    // For archipelago cities `main` is empty by design; everything sits in
+    // `near` so the standard view shows all islands.
+    const standard = emitBucket([...main, ...near]);
+    const full = far.length > 0 ? emitBucket([...main, ...near, ...far]) : null;
+    const mainOnly = near.length > 0 && !archipelago ? emitBucket(main) : null;
+
     const kana = kanaFor(code);
     const subregion = prefCode === '01' ? hokkaidoSubregionOf(code) : null;
     const out = {
       id: code,
       name,
       reading: readingFor(code, name),
-      path,
-      bounds: {
-        north: +bounds.north.toFixed(4),
-        south: +bounds.south.toFixed(4),
-        east:  +bounds.east.toFixed(4),
-        west:  +bounds.west.toFixed(4),
-      },
+      path: standard.path,
+      bounds: standard.bounds,
     };
+    if (full) {
+      out.pathFull = full.path;
+      out.boundsFull = full.bounds;
+    }
+    if (mainOnly) {
+      out.pathMain = mainOnly.path;
+      out.boundsMain = mainOnly.bounds;
+    }
     if (kana) out.kana = kana;
     if (subregion) out.subregion = subregion;
     return out;
@@ -394,7 +524,10 @@ async function buildPrefecture(prefCode, prefName) {
 async function emitBoundsIndex() {
   // Flat array of every municipality's bbox (~140 KB). Loaded once on the
   // top page so client-side GPS can match a municipality without fetching
-  // every prefecture's full polygon JSON.
+  // every prefecture's full polygon JSON. Uses the *full* bounds (level 0)
+  // so users on remote islands still match their parent municipality —
+  // the runtime silhouette may trim those islands at level 1/2, but the
+  // GPS match should remain inclusive.
   const citiesDir = path.join(OUT_DIR, 'cities');
   const files = (await fs.readdir(citiesDir)).filter(f => /^\d+\.json$/.test(f)).sort();
   const out = [];
@@ -402,7 +535,8 @@ async function emitBoundsIndex() {
     const prefCode = f.replace('.json', '');
     const cities = JSON.parse(await fs.readFile(path.join(citiesDir, f), 'utf8'));
     for (const c of cities) {
-      out.push({ code: c.id, prefCode, name: c.name, ...c.bounds });
+      const b = c.boundsFull ?? c.bounds;
+      out.push({ code: c.id, prefCode, name: c.name, ...b });
     }
   }
   const json = JSON.stringify(out);

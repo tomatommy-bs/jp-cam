@@ -40,6 +40,10 @@ export function update(state: State, msg: Msg): State {
           typeof p.showLocationPin === 'boolean' ? p.showLocationPin : state.showLocationPin,
         silhouetteRotated:
           typeof p.silhouetteRotated === 'boolean' ? p.silhouetteRotated : state.silhouetteRotated,
+        islandLevel:
+          p.islandLevel === 0 || p.islandLevel === 1 || p.islandLevel === 2
+            ? p.islandLevel
+            : state.islandLevel,
         settingsLoaded: true,
       };
     }
@@ -106,6 +110,8 @@ export function update(state: State, msg: Msg): State {
       return { ...state, maskMode: msg.mode };
     case 'silhouetteRotateToggled':
       return { ...state, silhouetteRotated: !state.silhouetteRotated };
+    case 'islandLevelSet':
+      return { ...state, islandLevel: msg.level };
     case 'coordsReceived':
       return { ...state, userCoords: msg.coords, geoError: null };
     case 'geoFailed':

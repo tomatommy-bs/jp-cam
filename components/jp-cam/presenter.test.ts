@@ -29,6 +29,44 @@ describe('presenter — currentCity & cities lifecycle', () => {
   });
 });
 
+describe('presenter — currentSilhouette (island level)', () => {
+  const FULL_BOUNDS = { north: 35, south: 33, east: 132, west: 130 };
+  const STD_BOUNDS = { north: 34.5, south: 33.5, east: 131.5, west: 130.5 };
+  const MAIN_BOUNDS = { north: 34.3, south: 33.7, east: 131.3, west: 130.7 };
+  const cityFull = makeCity({
+    id: 'rich', path: 'P-std', bounds: STD_BOUNDS,
+    pathFull: 'P-full', boundsFull: FULL_BOUNDS,
+    pathMain: 'P-main', boundsMain: MAIN_BOUNDS,
+  });
+
+  it('returns null while cities are loading', () => {
+    expect(P.currentSilhouette(init())).toBeNull();
+  });
+
+  it('level 1 → path/bounds (default)', () => {
+    const s = withCities({ ...init(), islandLevel: 1 }, [cityFull]);
+    expect(P.currentSilhouette(s)).toEqual({ path: 'P-std', bounds: STD_BOUNDS });
+  });
+
+  it('level 0 → pathFull/boundsFull when present', () => {
+    const s = withCities({ ...init(), islandLevel: 0 }, [cityFull]);
+    expect(P.currentSilhouette(s)).toEqual({ path: 'P-full', bounds: FULL_BOUNDS });
+  });
+
+  it('level 2 → pathMain/boundsMain when present', () => {
+    const s = withCities({ ...init(), islandLevel: 2 }, [cityFull]);
+    expect(P.currentSilhouette(s)).toEqual({ path: 'P-main', bounds: MAIN_BOUNDS });
+  });
+
+  it('falls back to path/bounds when level-specific variant is absent', () => {
+    const single = makeCity({ id: 'plain', path: 'P-only', bounds: STD_BOUNDS });
+    const s0 = withCities({ ...init(), islandLevel: 0 }, [single]);
+    const s2 = withCities({ ...init(), islandLevel: 2 }, [single]);
+    expect(P.currentSilhouette(s0)).toEqual({ path: 'P-only', bounds: STD_BOUNDS });
+    expect(P.currentSilhouette(s2)).toEqual({ path: 'P-only', bounds: STD_BOUNDS });
+  });
+});
+
 describe('presenter — silhouetteTransform', () => {
   it('without rotation', () => {
     expect(P.silhouetteTransform({ ...init(), scale: 1.25, silhouetteRotated: false }))
@@ -102,6 +140,28 @@ describe('presenter — dotPosRaw / dotPos', () => {
     const base = withCities({ ...init(), cityIndex: 0, userCoords: insideShimonoseki }, sampleCities);
     expect(P.dotPos({ ...base, showLocation: true })).not.toBeNull();
     expect(P.dotPos({ ...base, showLocation: false })).toBeNull();
+  });
+
+  it('reprojects against the level-specific bounds when the user switches islandLevel', () => {
+    // Wider Full bounds → narrower Main bounds. A coord at the center of the
+    // city must project to (100,100) in both — proving the projection picks
+    // up the level's bounds, not the legacy `bounds` field. A coord that's
+    // inside Full but outside Main must return null at level 2.
+    const FULL = { north: 34.6, south: 33.8, east: 131.3, west: 130.7 };
+    const MAIN = { north: 34.6, south: 34.3, east: 131.0, west: 130.8 };
+    const city = makeCity({
+      id: 'rich',
+      bounds: MAIN,
+      pathFull: 'F', boundsFull: FULL,
+      pathMain: 'M', boundsMain: MAIN,
+    });
+    // South of MAIN but still inside FULL — verifies the projection swaps
+    // its bbox source when islandLevel changes.
+    const coord = { lat: 34.0, lng: 130.9 };
+    const sFull = withCities({ ...init(), islandLevel: 0, userCoords: coord }, [city]);
+    expect(P.dotPosRaw(sFull)).not.toBeNull();
+    const sMain = withCities({ ...init(), islandLevel: 2, userCoords: coord }, [city]);
+    expect(P.dotPosRaw(sMain)).toBeNull();
   });
 });
 

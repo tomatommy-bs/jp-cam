@@ -95,7 +95,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
   // Destructure for view-side ergonomics — keeps JSX nearly identical.
   const {
     facingMode, zoom, cityIndex, color, opacity, scale, strokeWidth,
-    maskMode, silhouetteRotated, userCoords, geoError, showLocation,
+    maskMode, silhouetteRotated, islandLevel, userCoords, geoError, showLocation,
     showLocationPin, showSettings, activeMenu, cityPickerOpen, capture,
   } = state;
 
@@ -113,9 +113,16 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
   const previewShowLocation = P.previewShowLocation(state);
   const cities = P.cities(state);
   const currentCity = P.currentCity(state);
+  const currentSilhouette = P.currentSilhouette(state);
   const citiesLoading = P.citiesLoading(state);
   const citiesError = P.citiesError(state);
   const silhouetteTransform = P.silhouetteTransform(state);
+  // Whether 本島のみ / 全島 are meaningfully different from 標準 for *this*
+  // city. The data layer omits the variant fields when no trim applies
+  // (single-island cities, archipelago-guarded cities) so the picker can
+  // grey-out the unavailable options instead of silently flipping back.
+  const hasMainOnlyVariant = !!currentCity?.pathMain;
+  const hasFullVariant = !!currentCity?.pathFull;
 
   // Hydrate persisted settings on mount; always dispatch (even on miss/error)
   // so settingsLoaded flips and the save effect below begins running.
@@ -143,10 +150,11 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
         showLocation,
         showLocationPin,
         silhouetteRotated,
+        islandLevel,
       };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(s));
     } catch {}
-  }, [state.settingsLoaded, cityIndex, color, opacity, scale, strokeWidth, facingMode, maskMode, showLocation, showLocationPin, silhouetteRotated]);
+  }, [state.settingsLoaded, cityIndex, color, opacity, scale, strokeWidth, facingMode, maskMode, showLocation, showLocationPin, silhouetteRotated, islandLevel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,7 +280,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
       cityId: currentCity.id,
       cityName: currentCity.name,
       cityReading: currentCity.reading,
-      cityPath: currentCity.path,
+      cityPath: currentSilhouette?.path ?? currentCity.path,
       silhouetteTransform,
       silhouetteRotated,
       color,
@@ -526,7 +534,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                 transition: 'transform 80ms linear',
               }}
             />
-            {currentCity && (
+            {currentSilhouette && (
               <svg
                 className="absolute inset-0 w-full h-full pointer-events-none"
                 viewBox="0 0 200 200"
@@ -536,7 +544,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                   <mask id="silhouette-mask">
                     <rect x="-500" y="-500" width="1200" height="1200" fill="white" />
                     <g transform={silhouetteTransform}>
-                      <path d={currentCity.path} fill="black" />
+                      <path d={currentSilhouette.path} fill="black" />
                     </g>
                   </mask>
                 </defs>
@@ -548,7 +556,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                 />
                 <g transform={silhouetteTransform}>
                   <path
-                    d={currentCity.path}
+                    d={currentSilhouette.path}
                     fill="none"
                     stroke={color}
                     strokeWidth={strokeWidth}
@@ -671,6 +679,38 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                     >
                       塗りつぶし黒
                     </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1.5 tracking-wide">ISLANDS</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([
+                      { level: 0, label: '全島', available: hasFullVariant },
+                      { level: 1, label: '標準', available: true },
+                      { level: 2, label: '本島', available: hasMainOnlyVariant },
+                    ] as const).map(opt => {
+                      const active = islandLevel === opt.level;
+                      const disabled = !opt.available && !active;
+                      return (
+                        <button
+                          key={opt.level}
+                          onClick={() => !disabled && dispatch({ type: 'islandLevelSet', level: opt.level })}
+                          disabled={disabled}
+                          className={`py-1.5 rounded text-[11px] transition-colors ${
+                            active
+                              ? 'bg-white text-black font-semibold'
+                              : disabled
+                                ? 'bg-white/5 text-gray-500 cursor-not-allowed'
+                                : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                          }`}
+                          aria-pressed={active}
+                          title={disabled ? 'この市区町村では切替不要' : undefined}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

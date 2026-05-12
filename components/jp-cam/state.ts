@@ -4,7 +4,7 @@
 // side effects and dispatches Msgs (./message) into update
 // (./update) to transition between states defined here.
 
-import type { City } from '@/lib/cities-data';
+import type { City, IslandLevel } from '@/lib/cities-data';
 
 export type Coords = { lat: number; lng: number };
 export type ZoomCaps = { min: number; max: number; step: number };
@@ -68,6 +68,7 @@ export type State = {
   strokeWidth: number;
   maskMode: MaskMode;
   silhouetteRotated: boolean;
+  islandLevel: IslandLevel;
   // Geolocation
   userCoords: Coords | null;
   geoError: string | null;
@@ -94,6 +95,7 @@ export type PersistedSettings = {
   showLocation: boolean;
   showLocationPin: boolean;
   silhouetteRotated: boolean;
+  islandLevel: IslandLevel;
 };
 
 // Domain bounds used by update for clamping silhouette scale.
@@ -114,6 +116,7 @@ export function init(prefCode: string = '35'): State {
     strokeWidth: 1.65,
     maskMode: 'translucent',
     silhouetteRotated: false,
+    islandLevel: 1,
     userCoords: null,
     geoError: null,
     showLocation: true,

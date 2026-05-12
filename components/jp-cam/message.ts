@@ -1,7 +1,7 @@
 // Discriminated-union of every transition the view can request.
 // Pure data — no behavior here. See ./update for transitions.
 
-import type { City } from '@/lib/cities-data';
+import type { City, IslandLevel } from '@/lib/cities-data';
 
 import type { CapturedSnapshot, Coords, MaskMode, Menu, PersistedSettings, ZoomCaps } from './state';
 
@@ -26,6 +26,7 @@ export type Msg =
   | { type: 'strokeWidthSet'; value: number }
   | { type: 'maskModeSet'; mode: MaskMode }
   | { type: 'silhouetteRotateToggled' }
+  | { type: 'islandLevelSet'; level: IslandLevel }
   // Geolocation
   | { type: 'coordsReceived'; coords: Coords }
   | { type: 'geoFailed'; message: string }

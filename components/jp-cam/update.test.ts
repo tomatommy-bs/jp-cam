@@ -36,6 +36,7 @@ describe('update — settingsHydrated', () => {
         showLocation: false,
         showLocationPin: false,
         silhouetteRotated: true,
+        islandLevel: 2,
       },
     });
     expect(s.cityIndex).toBe(3);
@@ -48,7 +49,18 @@ describe('update — settingsHydrated', () => {
     expect(s.showLocation).toBe(false);
     expect(s.showLocationPin).toBe(false);
     expect(s.silhouetteRotated).toBe(true);
+    expect(s.islandLevel).toBe(2);
     expect(s.settingsLoaded).toBe(true);
+  });
+
+  it('rejects an out-of-range islandLevel and keeps the default', () => {
+    const before = init();
+    const s = update(before, {
+      type: 'settingsHydrated',
+      // @ts-expect-error — runtime guard against bogus persisted data
+      patch: { islandLevel: 7 },
+    });
+    expect(s.islandLevel).toBe(before.islandLevel);
   });
 
   it('ignores garbage values and still flips settingsLoaded', () => {
@@ -204,6 +216,11 @@ describe('update — silhouette settings', () => {
     expect(update(s, { type: 'opacitySet', opacity: 0.42 }).opacity).toBe(0.42);
     expect(update(s, { type: 'maskModeSet', mode: 'solid' }).maskMode).toBe('solid');
     expect(update(s, { type: 'silhouetteRotateToggled' }).silhouetteRotated).toBe(true);
+  });
+
+  it('islandLevelSet stores the chosen level', () => {
+    expect(update(init(), { type: 'islandLevelSet', level: 0 }).islandLevel).toBe(0);
+    expect(update(init(), { type: 'islandLevelSet', level: 2 }).islandLevel).toBe(2);
   });
 
   it('scaleNudged clamps to SCALE_MIN..SCALE_MAX', () => {
