@@ -117,12 +117,10 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
   const citiesLoading = P.citiesLoading(state);
   const citiesError = P.citiesError(state);
   const silhouetteTransform = P.silhouetteTransform(state);
-  // Whether 本島のみ / 全島 are meaningfully different from 標準 for *this*
-  // city. The data layer omits the variant fields when no trim applies
-  // (single-island cities, archipelago-guarded cities) so the picker can
-  // grey-out the unavailable options instead of silently flipping back.
+  // 本島のみ が *この市区町村* で 標準 と異なる結果になるか。pathMain が
+  // 出ていない (= 単一島・群島ガード発動) 場合は切替不要なので、UI で
+  // disabled にして混乱を防ぐ。全島 / 標準 は常時押せる。
   const hasMainOnlyVariant = !!currentCity?.pathMain;
-  const hasFullVariant = !!currentCity?.pathFull;
 
   // Hydrate persisted settings on mount; always dispatch (even on miss/error)
   // so settingsLoaded flips and the save effect below begins running.
@@ -710,8 +708,10 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                   )}
                   <div className="grid grid-cols-3 gap-1.5">
                     {([
+                      // 標準 はデフォルト経路。pathFull がない自治体では全島と
+                      // 同じ結果になるが、視覚的に害は無いので常時選択可能にしておく。
                       { level: 0, label: '全島', beta: false, available: true },
-                      { level: 1, label: '標準', beta: true,  available: hasFullVariant },
+                      { level: 1, label: '標準', beta: true,  available: true },
                       { level: 2, label: '本島', beta: true,  available: hasMainOnlyVariant },
                     ] as const).map(opt => {
                       const active = islandLevel === opt.level;

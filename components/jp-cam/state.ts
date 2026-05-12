@@ -117,7 +117,7 @@ export function init(prefCode: string = '35'): State {
     strokeWidth: 1.65,
     maskMode: 'translucent',
     silhouetteRotated: false,
-    islandLevel: 0,
+    islandLevel: 1,
     userCoords: null,
     geoError: null,
     showLocation: true,
