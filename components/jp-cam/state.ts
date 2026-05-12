@@ -9,7 +9,7 @@ import type { City, IslandLevel } from '@/lib/cities-data';
 export type Coords = { lat: number; lng: number };
 export type ZoomCaps = { min: number; max: number; step: number };
 export type MaskMode = 'translucent' | 'solid';
-export type Menu = 'stroke' | 'size' | 'zoom';
+export type Menu = 'stroke' | 'size' | 'zoom' | 'islands';
 export type FacingMode = 'environment' | 'user';
 
 export type CapturedSnapshot = {

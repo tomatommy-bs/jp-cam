@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useReducer } from 'react';
-import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn, Search, HelpCircle } from 'lucide-react';
+import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn, Search, HelpCircle, Anchor } from 'lucide-react';
 
 import { init, SCALE_MAX, SCALE_MIN } from './state';
 import type {
@@ -488,13 +488,93 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
             <p className="text-[9px] text-gray-400 leading-none">JP-CAM 市区町村シルエットカメラ</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 relative">
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'menuToggled', menu: 'islands' })}
+            className={`p-2 rounded-full transition-colors ${
+              activeMenu === 'islands'
+                ? 'bg-white text-black'
+                : 'hover:bg-white/10 active:bg-white/20'
+            }`}
+            aria-label="表示する離島の範囲"
+            aria-expanded={activeMenu === 'islands'}
+            title="表示する離島の範囲"
+          >
+            <Anchor className="w-4 h-4" />
+          </button>
           <button onClick={switchCamera} className="p-2 rounded-full hover:bg-white/10 active:bg-white/20" title="カメラ切替">
             <RefreshCw className="w-4 h-4" />
           </button>
           <button onClick={() => dispatch({ type: 'settingsToggled' })} className={`p-2 rounded-full ${showSettings ? 'bg-white/20' : 'hover:bg-white/10 active:bg-white/20'}`} title="設定">
             <Sliders className="w-4 h-4" />
           </button>
+
+          {activeMenu === 'islands' && (
+            <div className="absolute top-full right-0 mt-2 w-64 z-40 rounded-xl bg-black/95 backdrop-blur-md border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.6)] p-3 space-y-2">
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] text-gray-400 tracking-wide">ISLANDS</label>
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: 'islandHelpToggled' })}
+                  className={`p-0.5 rounded-full transition-colors ${
+                    islandHelpOpen ? 'text-white bg-white/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
+                  }`}
+                  aria-expanded={islandHelpOpen}
+                  aria-label="ISLANDS の説明"
+                >
+                  <HelpCircle className="w-3 h-3" />
+                </button>
+              </div>
+              {islandHelpOpen && (
+                <p className="text-[10px] text-gray-300 leading-relaxed px-2 py-1.5 rounded bg-white/[0.04] border border-white/10">
+                  離島まで含めるとシルエットが小さく偏ることがあります。表示する島の範囲を選べます。
+                  <br />
+                  <span className="text-gray-400">・全島: すべての離島を含む</span>
+                  <br />
+                  <span className="text-gray-400">・標準: 遠隔の小さな島を省略</span>
+                  <br />
+                  <span className="text-gray-400">・本島のみ: 最大の島だけ表示</span>
+                </p>
+              )}
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  { level: 0, label: '全島', beta: false, available: true },
+                  { level: 1, label: '標準', beta: true,  available: true },
+                  { level: 2, label: '本島', beta: true,  available: hasMainOnlyVariant },
+                ] as const).map(opt => {
+                  const active = islandLevel === opt.level;
+                  const disabled = !opt.available && !active;
+                  return (
+                    <button
+                      key={opt.level}
+                      onClick={() => !disabled && dispatch({ type: 'islandLevelSet', level: opt.level })}
+                      disabled={disabled}
+                      className={`relative py-1.5 rounded text-[11px] transition-colors ${
+                        active
+                          ? 'bg-white text-black font-semibold'
+                          : disabled
+                            ? 'bg-white/5 text-gray-500 cursor-not-allowed'
+                            : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                      }`}
+                      aria-pressed={active}
+                      title={disabled ? 'この市区町村では切替不要' : undefined}
+                    >
+                      {opt.label}
+                      {opt.beta && (
+                        <span
+                          className="absolute -top-1 -right-1 px-1 py-px rounded text-[7px] font-bold leading-none tracking-wider bg-amber-500 text-black"
+                          aria-label="ベータ版"
+                        >
+                          β
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -677,74 +757,6 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                     >
                       塗りつぶし黒
                     </button>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-1 mb-1.5">
-                    <label className="text-[10px] text-gray-400 tracking-wide">ISLANDS</label>
-                    <button
-                      type="button"
-                      onClick={() => dispatch({ type: 'islandHelpToggled' })}
-                      className={`p-0.5 rounded-full transition-colors ${
-                        islandHelpOpen ? 'text-white bg-white/10' : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
-                      }`}
-                      aria-expanded={islandHelpOpen}
-                      aria-label="ISLANDS の説明"
-                    >
-                      <HelpCircle className="w-3 h-3" />
-                    </button>
-                  </div>
-                  {islandHelpOpen && (
-                    <p className="text-[10px] text-gray-300 leading-relaxed mb-1.5 px-2 py-1.5 rounded bg-white/[0.04] border border-white/10">
-                      離島まで含めるとシルエットが小さく偏ることがあります。表示する島の範囲を選べます。
-                      <br />
-                      <span className="text-gray-400">・全島: すべての離島を含む</span>
-                      <br />
-                      <span className="text-gray-400">・標準: 遠隔の小さな島を省略</span>
-                      <br />
-                      <span className="text-gray-400">・本島のみ: 最大の島だけ表示</span>
-                    </p>
-                  )}
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {([
-                      // 標準 はデフォルト経路。pathFull がない自治体では全島と
-                      // 同じ結果になるが、視覚的に害は無いので常時選択可能にしておく。
-                      { level: 0, label: '全島', beta: false, available: true },
-                      { level: 1, label: '標準', beta: true,  available: true },
-                      { level: 2, label: '本島', beta: true,  available: hasMainOnlyVariant },
-                    ] as const).map(opt => {
-                      const active = islandLevel === opt.level;
-                      const disabled = !opt.available && !active;
-                      return (
-                        <button
-                          key={opt.level}
-                          onClick={() => !disabled && dispatch({ type: 'islandLevelSet', level: opt.level })}
-                          disabled={disabled}
-                          className={`relative py-1.5 rounded text-[11px] transition-colors ${
-                            active
-                              ? 'bg-white text-black font-semibold'
-                              : disabled
-                                ? 'bg-white/5 text-gray-500 cursor-not-allowed'
-                                : 'bg-white/10 text-gray-200 hover:bg-white/20'
-                          }`}
-                          aria-pressed={active}
-                          title={disabled ? 'この市区町村では切替不要' : undefined}
-                        >
-                          {opt.label}
-                          {opt.beta && (
-                            <span
-                              className={`absolute -top-1 -right-1 px-1 py-px rounded text-[7px] font-bold leading-none tracking-wider ${
-                                active ? 'bg-amber-500 text-black' : 'bg-amber-500/80 text-black'
-                              }`}
-                              aria-label="ベータ版"
-                            >
-                              β
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
                   </div>
                 </div>
 
