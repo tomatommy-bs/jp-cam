@@ -84,7 +84,7 @@ export function update(state: State, msg: Msg): State {
     case 'citySelected': {
       const len = citiesLength(state);
       if (len === 0 || msg.index < 0 || msg.index >= len) return state;
-      return { ...state, cityIndex: msg.index };
+      return { ...state, cityIndex: msg.index, cityPickerOpen: false };
     }
     case 'cityStepped': {
       const len = citiesLength(state);
@@ -122,6 +122,10 @@ export function update(state: State, msg: Msg): State {
       return { ...state, activeMenu: state.activeMenu === msg.menu ? null : msg.menu };
     case 'menuClosed':
       return { ...state, activeMenu: null };
+    case 'cityPickerOpened':
+      return { ...state, cityPickerOpen: true, activeMenu: null, showSettings: false };
+    case 'cityPickerClosed':
+      return { ...state, cityPickerOpen: false };
     case 'captureCompleted':
       return {
         ...state,

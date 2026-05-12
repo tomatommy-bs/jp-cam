@@ -36,6 +36,8 @@ export type Msg =
   | { type: 'settingsClosed' }
   | { type: 'menuToggled'; menu: Menu }
   | { type: 'menuClosed' }
+  | { type: 'cityPickerOpened' }
+  | { type: 'cityPickerClosed' }
   // Capture flow
   | { type: 'captureCompleted'; raw: string; composed: string; snapshot: CapturedSnapshot }
   | { type: 'previewMaskSet'; mode: MaskMode; composed: string }

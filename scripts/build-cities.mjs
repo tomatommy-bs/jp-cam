@@ -15,6 +15,8 @@ import { fileURLToPath } from 'node:url';
 import polygonClipping from 'polygon-clipping';
 import { toRomaji } from 'wanakana';
 
+import { hokkaidoSubregionOf } from './hokkaido-subregion.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'public', 'data');
@@ -56,17 +58,28 @@ function stripMunicipalitySuffix(name, kana) {
   return { stem: name, stemKana: kana };
 }
 
-// Derive a Hepburn-uppercase reading from the official kana, falling back
-// to the kanji name when localgovjp doesn't list this code (rare; mostly
-// the parent of merged historical municipalities).
-function readingFor(code, name) {
+// Returns the official hiragana for this code (without designated-city
+// parent prefix). Used by both the romaji derivation and the kana field
+// that the city-picker search/50音-tab features rely on. Returns null when
+// the code is missing from the localgovjp index (rare — mostly historical
+// merges and the disputed northern-territory villages).
+function kanaFor(code) {
   let kana = KANA_INDEX[code];
-  if (!kana) return name; // fallback — keeps the entry usable
+  if (!kana) return null;
   // Designated-city wards come back as "札幌市 中央区"; we want just the
   // ward portion ("中央区" → ちゅうおうく). We don't actually emit ward-
   // level entries (they're merged into the parent), but be defensive.
   const sp = kana.lastIndexOf(' ');
   if (sp >= 0) kana = kana.slice(sp + 1);
+  return kana;
+}
+
+// Derive a Hepburn-uppercase reading from the official kana, falling back
+// to the kanji name when localgovjp doesn't list this code (rare; mostly
+// the parent of merged historical municipalities).
+function readingFor(code, name) {
+  const kana = kanaFor(code);
+  if (!kana) return name; // fallback — keeps the entry usable
   const { stemKana } = stripMunicipalitySuffix(name, kana);
   return toRomaji(stemKana).toUpperCase();
 }
@@ -339,7 +352,9 @@ async function buildPrefecture(prefCode, prefName) {
     const bounds = bboxOf(polygons);
     const projected = projectPolygons(polygons, bounds);
     const path = polygonsToPath(projected, 0.5);
-    return {
+    const kana = kanaFor(code);
+    const subregion = prefCode === '01' ? hokkaidoSubregionOf(code) : null;
+    const out = {
       id: code,
       name,
       reading: readingFor(code, name),
@@ -351,6 +366,9 @@ async function buildPrefecture(prefCode, prefName) {
         west:  +bounds.west.toFixed(4),
       },
     };
+    if (kana) out.kana = kana;
+    if (subregion) out.subregion = subregion;
+    return out;
   });
 }
 
