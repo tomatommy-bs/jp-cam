@@ -4,12 +4,12 @@
 // side effects and dispatches Msgs (./message) into update
 // (./update) to transition between states defined here.
 
-import type { City } from '@/lib/cities-data';
+import type { City, IslandLevel } from '@/lib/cities-data';
 
 export type Coords = { lat: number; lng: number };
 export type ZoomCaps = { min: number; max: number; step: number };
 export type MaskMode = 'translucent' | 'solid';
-export type Menu = 'stroke' | 'size' | 'zoom';
+export type Menu = 'stroke' | 'size' | 'zoom' | 'islands';
 export type FacingMode = 'environment' | 'user';
 
 export type CapturedSnapshot = {
@@ -68,6 +68,7 @@ export type State = {
   strokeWidth: number;
   maskMode: MaskMode;
   silhouetteRotated: boolean;
+  islandLevel: IslandLevel;
   // Geolocation
   userCoords: Coords | null;
   geoError: string | null;
@@ -77,6 +78,7 @@ export type State = {
   showSettings: boolean;
   activeMenu: Menu | null;
   cityPickerOpen: boolean;
+  islandHelpOpen: boolean;
   // Capture / preview-edit flow
   capture: Capture;
   // Persistence
@@ -94,6 +96,7 @@ export type PersistedSettings = {
   showLocation: boolean;
   showLocationPin: boolean;
   silhouetteRotated: boolean;
+  islandLevel: IslandLevel;
 };
 
 // Domain bounds used by update for clamping silhouette scale.
@@ -114,6 +117,7 @@ export function init(prefCode: string = '35'): State {
     strokeWidth: 1.65,
     maskMode: 'translucent',
     silhouetteRotated: false,
+    islandLevel: 1,
     userCoords: null,
     geoError: null,
     showLocation: true,
@@ -121,6 +125,7 @@ export function init(prefCode: string = '35'): State {
     showSettings: false,
     activeMenu: null,
     cityPickerOpen: false,
+    islandHelpOpen: false,
     capture: { kind: 'idle' },
     settingsLoaded: false,
   };

@@ -21,8 +21,22 @@ export type City = {
   id: string; // 5-digit 市区町村コード
   name: string; // 下関市, 千代田区, 軽井沢町, etc.
   reading: string;
+  // Default (level 1, standard) silhouette: main land mass + close-or-
+  // sizeable adjacent islands. Always present.
   path: string; // SVG path string on a 0-200 viewBox
   bounds: CityBounds;
+  // Optional level-0 (全島) variant — emitted only when the build pipeline
+  // dropped one or more remote islands from the standard view. Falls back
+  // to `path` / `bounds` when absent (i.e., the city has no remote islands
+  // worth distinguishing).
+  pathFull?: string;
+  boundsFull?: CityBounds;
+  // Optional level-2 (本島のみ) variant — emitted only when the city has a
+  // dominant main polygon AND non-trivial near-island pieces that level 2
+  // would strip. Absent when level 2 would render identically to level 1
+  // (single-island cities, archipelago-guarded cities like 小笠原村).
+  pathMain?: string;
+  boundsMain?: CityBounds;
   // Optional: official hiragana for this code (e.g., "しものせきし").
   // Missing for the 北方領土 villages and a few historical merges where
   // localgovjp has no entry. The city picker's search / 50音 tabs treat
@@ -32,6 +46,23 @@ export type City = {
   // prefCode === '01'. See scripts/hokkaido-subregion.mjs.
   subregion?: string;
 };
+
+// Three discrete user-facing silhouette modes:
+//   0 = 全島表示 — include every offshore island
+//   1 = 標準     — drop tiny remote islands (default)
+//   2 = 本島のみ  — single largest land mass only (falls back to 1 for
+//                  archipelago-type cities where no main exists)
+export type IslandLevel = 0 | 1 | 2;
+
+export function resolveSilhouette(city: City, level: IslandLevel): { path: string; bounds: CityBounds } {
+  if (level === 0 && city.pathFull && city.boundsFull) {
+    return { path: city.pathFull, bounds: city.boundsFull };
+  }
+  if (level === 2 && city.pathMain && city.boundsMain) {
+    return { path: city.pathMain, bounds: city.boundsMain };
+  }
+  return { path: city.path, bounds: city.bounds };
+}
 
 export async function loadPrefectures(): Promise<Prefecture[]> {
   const res = await fetch('/data/prefectures.json');

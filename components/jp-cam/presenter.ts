@@ -9,7 +9,8 @@ import type {
   State,
   ZoomCaps,
 } from './state';
-import type { City } from '@/lib/cities-data';
+import type { City, CityBounds } from '@/lib/cities-data';
+import { resolveSilhouette } from '@/lib/cities-data';
 import { projectPoint, projectionFor } from '@/lib/projection';
 
 export type Point = { x: number; y: number };
@@ -21,6 +22,16 @@ export function cities(state: State): City[] {
 export function currentCity(state: State): City | null {
   if (state.cities.kind !== 'ready') return null;
   return state.cities.cities[state.cityIndex] ?? null;
+}
+
+// Silhouette path + bounds for the current city under the user-selected
+// island-trim level. Returns null while cities are loading or the index is
+// out of range. Both the on-screen render and the GPS-pin projection must
+// agree on these values — see `dotPosRaw` below.
+export function currentSilhouette(state: State): { path: string; bounds: CityBounds } | null {
+  const city = currentCity(state);
+  if (!city) return null;
+  return resolveSilhouette(city, state.islandLevel);
 }
 
 export function citiesLoading(state: State): boolean {
@@ -45,9 +56,9 @@ export function silhouetteTransform(state: State): string {
 // outside the current city's bbox.
 export function dotPosRaw(state: State): Point | null {
   if (!state.userCoords) return null;
-  const city = currentCity(state);
-  if (!city) return null;
-  const { bounds: b } = city;
+  const sil = currentSilhouette(state);
+  if (!sil) return null;
+  const b = sil.bounds;
   const { lat, lng } = state.userCoords;
   if (lat < b.south || lat > b.north || lng < b.west || lng > b.east) return null;
   return projectPoint(b, projectionFor(b), lng, lat);
