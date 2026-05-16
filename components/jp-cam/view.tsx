@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useReducer } from 'react';
-import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn, Search, HelpCircle, Anchor } from 'lucide-react';
+import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn, Search, HelpCircle, Anchor, Share2 } from 'lucide-react';
 
 import { init, SCALE_MAX, SCALE_MIN } from './state';
 import type {
@@ -448,14 +448,11 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
     document.body.removeChild(link);
   };
 
-  const handleDownload = async () => {
+  const handleShare = async () => {
     if (!capturedImage) return;
     const cityId = capturedSnapshot?.cityId ?? currentCity?.id ?? 'unknown';
     const filename = captureFilename(cityId);
 
-    // iOS Safari ignores <a download>, so prefer the Web Share API which
-    // surfaces the native share sheet ("写真に追加" / "画像を保存"). Falls back
-    // to the anchor-click trick on desktop where share-with-files is absent.
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
         const file = new File([dataUrlToBlob(capturedImage)], filename, { type: 'image/jpeg' });
@@ -469,7 +466,14 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
       }
     }
 
+    // No share sheet available — fall back to saving so the action still completes.
     downloadViaAnchor(capturedImage, filename);
+  };
+
+  const handleSave = () => {
+    if (!capturedImage) return;
+    const cityId = capturedSnapshot?.cityId ?? currentCity?.id ?? 'unknown';
+    downloadViaAnchor(capturedImage, captureFilename(cityId));
   };
 
   return (
@@ -1086,17 +1090,24 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                 </div>
               </div>
             )}
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-2 justify-center flex-wrap">
               <button
                 onClick={handleRetake}
-                className="px-5 py-3 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center gap-2 text-sm transition-colors"
+                className="px-4 py-3 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center gap-2 text-sm transition-colors"
               >
                 <RotateCcw className="w-4 h-4" />
                 撮り直す
               </button>
               <button
-                onClick={handleDownload}
-                className="px-6 py-3 rounded-full bg-white text-black hover:bg-gray-200 active:bg-gray-300 flex items-center gap-2 font-semibold text-sm transition-colors"
+                onClick={handleShare}
+                className="px-5 py-3 rounded-full bg-white/15 hover:bg-white/25 active:bg-white/35 border border-white/30 flex items-center gap-2 font-semibold text-sm transition-colors"
+              >
+                <Share2 className="w-4 h-4" />
+                共有
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-5 py-3 rounded-full bg-white text-black hover:bg-gray-200 active:bg-gray-300 flex items-center gap-2 font-semibold text-sm transition-colors"
               >
                 <Download className="w-4 h-4" />
                 保存
