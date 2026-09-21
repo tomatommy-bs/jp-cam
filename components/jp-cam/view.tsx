@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useRef, useEffect, useReducer } from 'react';
-import { Camera, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn, Search, HelpCircle, Anchor, Share2 } from 'lucide-react';
+import React, { useRef, useEffect, useReducer, useState } from 'react';
+import { Camera, Check, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, AlertCircle, Sliders, X, RefreshCw, MapPin, Maximize2, Plus, Minus, ZoomIn, Search, HelpCircle, Anchor, Share2 } from 'lucide-react';
 
 import { init, SCALE_MAX, SCALE_MIN } from './state';
 import type {
@@ -10,6 +10,7 @@ import type {
   PersistedSettings,
 } from './state';
 import { loadCities } from '@/lib/cities-data';
+import { getCurrentPosition, isNative, saveImageToPhotos, shareImage } from '@/lib/native';
 import { update } from './update';
 import * as P from './presenter';
 import {
@@ -169,22 +170,17 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
   }, [state.prefCode]);
 
   useEffect(() => {
-    if (!('geolocation' in navigator)) {
-      dispatch({ type: 'geoFailed', message: '位置情報に対応していません' });
-      return;
-    }
     let cancelled = false;
-    navigator.geolocation.getCurrentPosition(
-      pos => {
+    getCurrentPosition({ enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 })
+      .then(coords => {
+        if (!cancelled) dispatch({ type: 'coordsReceived', coords });
+      })
+      .catch((err: unknown) => {
         if (cancelled) return;
-        dispatch({ type: 'coordsReceived', coords: { lat: pos.coords.latitude, lng: pos.coords.longitude } });
-      },
-      err => {
-        if (cancelled) return;
-        dispatch({ type: 'geoFailed', message: err.message || '位置情報を取得できません' });
-      },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-    );
+        // GeolocationPositionError (web) and plugin errors (native) both carry .message.
+        const message = (err as { message?: string } | null)?.message;
+        dispatch({ type: 'geoFailed', message: message || '位置情報を取得できません' });
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -448,10 +444,24 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
     document.body.removeChild(link);
   };
 
+  // ネイティブ版で写真アプリへの保存が終わったことを示す一時表示。
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'failed'>('idle');
+  useEffect(() => {
+    if (saveStatus === 'idle') return;
+    const t = setTimeout(() => setSaveStatus('idle'), 2000);
+    return () => clearTimeout(t);
+  }, [saveStatus]);
+
   const handleShare = async () => {
     if (!capturedImage) return;
     const cityId = capturedSnapshot?.cityId ?? currentCity?.id ?? 'unknown';
     const filename = captureFilename(cityId);
+
+    if (isNative()) {
+      // Share sheet dismissal rejects too; there is nothing to fall back to.
+      await shareImage(capturedImage, filename).catch(() => {});
+      return;
+    }
 
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
@@ -470,14 +480,24 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
     downloadViaAnchor(capturedImage, filename);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!capturedImage) return;
     const cityId = capturedSnapshot?.cityId ?? currentCity?.id ?? 'unknown';
-    downloadViaAnchor(capturedImage, captureFilename(cityId));
+    const filename = captureFilename(cityId);
+    if (isNative()) {
+      try {
+        await saveImageToPhotos(capturedImage, filename);
+        setSaveStatus('saved');
+      } catch {
+        setSaveStatus('failed');
+      }
+      return;
+    }
+    downloadViaAnchor(capturedImage, filename);
   };
 
   return (
-    <div className="w-full h-screen bg-black text-white flex flex-col overflow-hidden relative" style={{ height: '100vh' }}>
+    <div className="w-full h-dvh bg-black text-white flex flex-col overflow-hidden relative pt-safe pb-safe">
       {/* Header */}
       <div className="px-4 py-2.5 flex items-center justify-between bg-black z-20 border-b border-white/5">
         <div className="flex items-center gap-2">
@@ -1006,7 +1026,7 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
 
       {/* Captured image overlay */}
       {capturedImage && (
-        <div className="absolute inset-0 bg-black z-50 flex flex-col">
+        <div className="absolute inset-0 bg-black z-50 flex flex-col pt-safe pb-safe">
           <div className="flex-1 overflow-auto flex items-center justify-center p-3">
             <img src={capturedImage} alt="撮影された写真" className="max-w-full max-h-full object-contain rounded shadow-2xl" />
           </div>
@@ -1109,8 +1129,8 @@ export default function JpCamera({ prefCode, prefName, initialCityId, onBack }: 
                 onClick={handleSave}
                 className="px-5 py-3 rounded-full bg-white text-black hover:bg-gray-200 active:bg-gray-300 flex items-center gap-2 font-semibold text-sm transition-colors"
               >
-                <Download className="w-4 h-4" />
-                保存
+                {saveStatus === 'saved' ? <Check className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                {saveStatus === 'saved' ? '保存しました' : saveStatus === 'failed' ? '保存に失敗' : '保存'}
               </button>
             </div>
           </div>

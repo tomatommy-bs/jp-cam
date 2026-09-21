@@ -12,6 +12,8 @@ This project uses **pnpm** (see `packageManager` in package.json).
 - `pnpm lint` — `eslint .`
 - `pnpm test` — run Vitest once (CI mode); `pnpm test:watch` for watch mode
 - `pnpm build:cities` — regenerate `public/data/{prefectures,cities/*}.json` from niiyz/JapanCityGeoJson
+- `pnpm build:native` — static export (`out/`) + `cap sync` for the iOS/Android shells
+- `pnpm cap:ios` / `pnpm cap:android` — open the native project in Xcode / Android Studio
 
 Tests cover the pure modules in `components/jp-cam/` (`update.ts`, `presenter.ts`, `compose.ts`). The view component (`view.tsx`) is not unit-tested — all I/O is funneled through `dispatch`, so reducer/derivation tests are sufficient.
 
@@ -57,6 +59,30 @@ A mobile-first webcam app for the entire country: from the top page the user pic
 - **Camera/zoom:** uses `navigator.mediaDevices.getUserMedia` with `facingMode` toggle. Hardware zoom is preferred via `MediaTrackCapabilities.zoom` + `applyConstraints({ advanced: [{ zoom }] })`; if unavailable (`zoomCaps === null`), it falls back to CSS `transform: scale()` digital zoom and crops the source rect during capture to match.
 - **Geolocation:** `navigator.geolocation.getCurrentPosition` is called once on mount. The pin is drawn only when the user is inside the current city's bbox; the location toggle independently controls the live preview (`dotPos`) and the saved image (`previewShowLocation`). GPS is also embedded in EXIF when `showLocation` was true at capture time.
 - **Cities lifecycle:** `state.cities` is a discriminated union (`loading` / `ready` / `error`). `currentCity` from the presenter is nullable until cities resolve; the view shows "都市データ読込中…" in the picker until then.
+
+### Native apps (Capacitor)
+
+The same codebase ships as the web app (Vercel) and as iOS/Android apps wrapped
+with Capacitor 8. `pnpm build:native` sets `NEXT_PUBLIC_NATIVE=1`, which flips
+`next.config.mjs` to `output: 'export'` and drops Vercel Analytics; the default
+`pnpm build` is unchanged for the web deploy.
+
+- **`lib/native.ts`** — the only place that branches on platform. `getCurrentPosition`
+  uses `@capacitor/geolocation` in the app and `navigator.geolocation` on the web;
+  `saveImageToPhotos` (photo library, `JP-CAM` album on Android) and `shareImage`
+  (native share sheet) are native-only, with the web keeping its anchor download /
+  Web Share path. Camera capture stays on `getUserMedia` everywhere.
+- **`capacitor.config.ts`** — `webDir: 'out'`. `appId` is still a placeholder; it must
+  be settled before any store release, since it cannot change afterwards.
+- **Permissions** — declared in `ios/App/App/Info.plist` and
+  `android/app/src/main/AndroidManifest.xml` (camera, location, photo library).
+  Both shells are locked to portrait, matching the portrait-only UI.
+- **Safe area** — `pt-safe` / `pb-safe` (`@utility` in `app/globals.css`) plus
+  `viewportFit: 'cover'` in `app/layout.tsx`. These apply to the web build too.
+- **Toolchain** — iOS needs Xcode 26+ (Capacitor 8 will not compile on older Xcode).
+- **Deep links** — the shell serves `index.html` for extension-less paths, so a cold
+  load of `/13` inside the app lands on the top page. In-app navigation is all
+  client-side, so this is not reachable in practice.
 
 ### shadcn/ui
 `components/ui/` contains a large catalog of generated shadcn components (new-york style, configured in `components.json`). The main camera component does **not** use any of them — it ships its own raw Tailwind UI. Do not assume shadcn is the convention here; match the surrounding style of `view.tsx` when extending it.

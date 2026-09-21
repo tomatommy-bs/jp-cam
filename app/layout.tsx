@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
@@ -29,6 +29,17 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#000000',
+}
+
+// The Capacitor build is a static export bundled into the app; Vercel
+// Analytics only makes sense for the hosted web build.
+const isNativeBuild = process.env.NEXT_PUBLIC_NATIVE === '1'
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,7 +49,7 @@ export default function RootLayout({
     <html lang="ja" className="bg-black">
       <body className="font-sans antialiased">
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === 'production' && !isNativeBuild && <Analytics />}
       </body>
     </html>
   )

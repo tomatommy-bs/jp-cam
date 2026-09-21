@@ -123,3 +123,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Safe-area insets (notch / home indicator). Active when the viewport uses
+   viewport-fit=cover — always true inside the Capacitor shell. */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
