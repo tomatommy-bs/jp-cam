@@ -16,7 +16,7 @@ export default async function Home() {
   const prefectures = await readPrefectures();
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col">
+    <main className="min-h-dvh bg-black text-white flex flex-col pt-safe pb-safe">
       <header className="px-4 py-3 flex items-center gap-2 border-b border-white/5">
         <MapPin className="w-4 h-4 text-amber-400" />
         <div>

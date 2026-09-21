@@ -78,7 +78,7 @@ export default function CityPickerSheet({
   const anyFilter = !!query || row !== null || subregion !== null;
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-black/95 backdrop-blur-md text-white">
+    <div className="fixed inset-0 z-40 flex flex-col bg-black/95 backdrop-blur-md text-white pt-safe pb-safe">
       <div className="px-4 py-3 flex items-center gap-2 border-b border-white/10">
         <div className="flex-1">
           <div className="text-[10px] text-gray-400 tracking-wider">PREFECTURE</div>

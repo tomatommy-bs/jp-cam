@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { MapPin, Loader2 } from 'lucide-react';
 
 import { findMunicipality, loadBounds } from '@/lib/cities-data';
+import { getCurrentPosition } from '@/lib/native';
 import type { Prefecture } from '@/lib/cities-data';
 
 type Status =
@@ -12,29 +13,20 @@ type Status =
   | { kind: 'locating' }
   | { kind: 'matched'; prefCode: string; prefName: string; cityCode: string; cityName: string }
   | { kind: 'denied' }
-  | { kind: 'unmatched' }
-  | { kind: 'unsupported' };
+  | { kind: 'unmatched' };
 
 export default function LocatePrompt({ prefectures }: { prefectures: Prefecture[] }) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
 
   useEffect(() => {
-    if (!('geolocation' in navigator)) {
-      setStatus({ kind: 'unsupported' });
-      return;
-    }
     let cancelled = false;
     setStatus({ kind: 'locating' });
     Promise.all([
-      new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: false, maximumAge: 30_000, timeout: 10_000,
-        });
-      }),
+      getCurrentPosition({ enableHighAccuracy: false, maximumAge: 30_000, timeout: 10_000 }),
       loadBounds(),
     ]).then(([pos, bounds]) => {
       if (cancelled) return;
-      const match = findMunicipality({ lat: pos.coords.latitude, lng: pos.coords.longitude }, bounds);
+      const match = findMunicipality(pos, bounds);
       if (!match) { setStatus({ kind: 'unmatched' }); return; }
       const pref = prefectures.find(p => p.code === match.prefCode);
       setStatus({
@@ -50,7 +42,7 @@ export default function LocatePrompt({ prefectures }: { prefectures: Prefecture[
     return () => { cancelled = true; };
   }, [prefectures]);
 
-  if (status.kind === 'idle' || status.kind === 'unsupported' || status.kind === 'denied' || status.kind === 'unmatched') {
+  if (status.kind === 'idle' || status.kind === 'denied' || status.kind === 'unmatched') {
     return null;
   }
 
